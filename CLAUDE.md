@@ -1,0 +1,103 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Development Commands
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm start` - Start production server
+- `npm run lint` - Run linting
+
+## Architecture Overview
+
+This is a Next.js 14 application — the studio-management dashboard for aka Move, a platform for dance studios (classes, private lessons, students, payments, events). Built with:
+- **Database**: Supabase (PostgreSQL) with authentication
+- **UI**: Tailwind CSS with a headless Radix UI component kit — see `app/components/ui/` and the `tailwind-ui-kit` skill (MUI has been fully removed from the codebase)
+- **State Management**: React Hook Form for forms
+- **Authentication**: Google OAuth via Supabase Auth
+
+### Core Data Model
+
+The application manages these main entities (see `api/db.sql`):
+- `student` - Student information with classes array
+- `class` - Individual classes with levels and ordering
+- `class_type` - Class categorization
+- `period` - Time periods containing classes, locations, and schedules
+- `payment` - Student payments linked to classes and periods
+- `instructor` - Instructors assigned to classes
+- `location` - Physical studio locations, each with its own per-period schedule
+- `event` / `event_payment` - Special events with day-of vs. advance pricing
+- `private_lesson` - One-off private lessons, separate from recurring classes
+- `credit` - Student account credits (applied via the Payment form's credit fields)
+- `notes` - Free-form notes attached to students
+- `profiles` - Auth-linked user profiles (Google OAuth, push tokens); keyed on `id` matching `auth.users.id`, linked to `student` by email
+- `settings` - Generic key/value store (default class prices, private-lesson studio fee, studio timezone)
+- `deletion_requests` - Log of account-deletion requests (Play Store compliance)
+
+### Project Structure
+
+- `api/` - Backend data-access modules organized by entity (`class`, `credit`, `events`, `instructor`, `location`, `notes`, `payment`, `period`, `private_lesson`, `profiles`, `settings`, `student`, `charts`)
+- `app/` - Next.js App Router pages and components
+  - `dashboard/` - Main application interface with nested routes (see Dashboard Sections below)
+  - `api/` - Next.js Route Handlers for account deletion and push notifications
+  - `components/` - Reusable components organized by function (`ui/` — shared Tailwind kit, `form/`, `charts/`, `lists/`, `notes/`, `oauth/`, `utils/`)
+  - `delete-account/` - Public account-deletion request page (Play Store compliance)
+- `lib/supabase/` - Supabase client configuration
+
+### Dashboard Sections (`app/dashboard/`)
+
+- **Students** (`students/`) - Roster, student detail/edit pages, new-student flow
+- **Classes** (`classes/`) - Class list and bulk update flow
+- **Periods** (`periods/`) - Create/edit periods, per-location schedules, class assignment
+- **Instructors** (`instructors/`) - Instructor roster and detail pages
+- **Locations** (`locations/`) - Studio location roster and detail pages
+- **Events** (`events/`) - Event roster, detail, and creation, with day-of vs. advance pricing
+- **Private Lessons** (`private-lessons/`) - Lesson roster, detail pages, and a dedicated **reports** view (period revenue: classes + private lessons + events by date range)
+- **Payments** (`payments/`) - Payment roster, per-student payment history, and edit flow
+- **Notes** (`notes/`) - Student notes
+- **Settings** (`settings/`) - Default class prices, private-lesson studio fee, studio timezone
+
+### Key Components
+
+- **Forms**: Located in `app/components/form/` - CRUD forms for classes, class types, events, instructors, locations, payments, periods, private lessons, students (`ClassItemForm`, `ClassTypeForm`, `EventForm`, `EventPaymentFields`, `InstructorForm`, `LocationForm`, `PaymentForm`, `PeriodForm`, `PrivateLessonForm`, `StudentForm`, plus `SortableItem`/`UseClassDialog`/`ClassByType` helpers)
+- **Charts**: In `app/components/charts/` - Analytics and data visualization (active/inactive students, student count by period, class-by-period breakdowns, events by period, private lessons by period, period revenue summary, total students)
+- **Navigation**: Dashboard uses sidebar navigation via `DashboardNavbar`, gated by `app/dashboard/layout.jsx`'s role-based access check
+- **Authentication**: Google OAuth handled by `GoogleOAuth.jsx`
+- **Push Notifications**: Route handlers at `app/api/notifications/period` and `app/api/notifications/event` broadcast to all registered Expo push tokens when a period or event goes live. **Note**: there is currently no live student-facing mobile app — this infrastructure (and the `profiles.push_token` column) predates/anticipates one but has no active consumer right now.
+- **Account Deletion**: `app/api/account/delete` and `app/api/account/delete-request` back the public `app/delete-account` deletion flow required for Play Store compliance (the in-app deletion path it also mentions assumes the not-yet-existing mobile app)
+- **UI Components**: `app/components/ui/` holds the Tailwind + Radix UI component kit (`Button`, `TextInput`, `Select`, `Combobox`, `DatePicker`, `Dialog`, `Tabs`, `Checkbox`, `Switch`, `Chip`, `ClassChips`, `PriceListEditor`, `Table`, `Pagination`, `Alert`, `Toast`, `PageHeader`, `BackButton`) used throughout the app. See the `tailwind-ui-kit` skill (`.claude/skills/tailwind-ui-kit/SKILL.md`) for the full inventory and brand tokens.
+
+### Database Integration
+
+- Supabase client configured in `lib/supabase/client.js`
+- Environment variables: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Row Level Security (RLS) enabled for profiles table
+- Uses UUID primary keys for all main entities
+
+### Push Notifications (Expo Push Notification Service)
+
+**Current status: no student-facing mobile app exists yet.** The description below documents how the push infrastructure is designed to work once such an app exists (or for any future client that registers an Expo push token) — it is not describing a currently-shipping app.
+
+Students would receive push notifications on a future aka Move mobile app (iOS + Android). That app would register an Expo push token on login and save it to the profiles.push_token column in Supabase.
+
+To send a push notification from any server-side route or action:
+
+// Fetch the student's push token from Supabase, then:
+await fetch("https://exp.host/--/api/v2/push/send", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    to: pushToken,            // "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
+    title: "Your title here",
+    body: "Your message here",
+    data: { /* any extra payload */ },
+  }),
+});
+
+Rules:
+- push_token may be null if the student denied permissions — always check before sending.
+- To send to multiple students, pass an array of token objects to the same endpoint (up to 100 per batch).
+- EPNS is free and handles APNs/FCM routing — do not call APNs or FCM directly.
+- Supabase URL: https://qsliwzvnwcnelqtwctyr.supabase.co
+- The profiles table is keyed on id (matches auth.users.id). Students are in the student table, linked to profiles by email.
