@@ -84,6 +84,10 @@ where id = '<tenant id>';
 
 The setup checklist's "dismissed" flag needs no migration — it's the `onboarding_checklist_dismissed` key in the existing tenant-scoped `settings` table.
 
+## Phase 9 — membership
+
+14. `014_downgrade_tenant_plan.sql` — `plan_rank(plan)` and the admin-only `downgrade_tenant_plan(tenant_id, plan)` RPC behind Settings → Membership. Only moves to a lower plan (upgrades raise `not_a_downgrade` until billing exists); downgrading during an active trial ends the trial so `expire_due_trials()` can't later overwrite the chosen plan. Also removes `plan` from `authenticated`'s UPDATE grant on `tenant` (now `name, slug, updated_at`), so plan changes only go through the RPC. Deploy with the Membership tab (`app/dashboard/settings/membership/`, `api/tenant/tenant.js`) — until it runs, the tab's "Switch" buttons return an error.
+
 ## After running any migration
 
 - Run its paired verification file, if one exists, and confirm every

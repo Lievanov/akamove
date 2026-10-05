@@ -11,6 +11,8 @@ import { ConfirmDialog } from "@/app/components/ui/ConfirmDialog";
 import { Button } from "@/app/components/ui/Button";
 import { IconButton } from "@/app/components/ui/IconButton";
 import { Chip } from "@/app/components/ui/Chip";
+import { Alert } from "@/app/components/ui/Alert";
+import Link from "next/link";
 import TextInput from "@/app/components/ui/TextInput";
 import { Select } from "@/app/components/ui/Select";
 import {
@@ -126,6 +128,19 @@ function Team() {
             time that address logs in with Google. Tell them directly to do
             so.
           </p>
+          {activeTenant?.plan === "starter" && (
+            <Alert severity="warning" className="mt-4">
+              Your studio is on Starter, which only includes admin accounts.
+              Staff you invite will see a message asking them to contact you
+              until you move to Studio or higher.{" "}
+              <Link
+                href="/dashboard/settings/membership"
+                className="font-semibold underline"
+              >
+                See plans
+              </Link>
+            </Alert>
+          )}
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
               <TextInput

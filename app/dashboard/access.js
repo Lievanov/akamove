@@ -20,6 +20,13 @@ export function canAccess(pathname, role) {
   return !rule || rule.roles.includes(role);
 }
 
+// Starter has no team roles (see pricing): only admins can use the
+// dashboard. Staff on a Starter studio see a "talk to your admin" screen
+// instead (StaffAccessBlocked) — this includes studios whose trial ended.
+export function planAllowsRole(plan, role) {
+  return !(plan === "starter" && role !== "admin");
+}
+
 // True when `pathname` is `section` or a page nested under it, so the
 // sidebar keeps a section highlighted on its detail and edit pages.
 export function isInSection(pathname, section) {

@@ -20,6 +20,7 @@ import { Select } from "@/app/components/ui/Select";
 import PriceListEditor from "@/app/components/ui/PriceListEditor";
 import { useOnboarding, usePageTour } from "@/app/context/OnboardingContext";
 import { TOURS } from "@/app/components/onboarding/tours";
+import SettingsTabs from "@/app/components/membership/SettingsTabs";
 
 function Settings() {
   const [loading, setLoading] = useState(true);
@@ -93,6 +94,7 @@ function Settings() {
           </Link>
         }
       />
+      <SettingsTabs />
       <div className="mx-auto max-w-2xl px-4 pb-8">
         <div className="my-6 rounded-lg border border-brand-dark/10 bg-white p-6 md:my-10 md:p-8">
           <div data-tour="settings-prices">

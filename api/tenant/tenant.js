@@ -22,6 +22,9 @@ const TRIAL_ERROR_MESSAGES = {
   trial_code_already_applied: "A code has already been applied to this studio.",
   trial_code_too_short: "That code wouldn't extend your trial past today.",
   no_trial: "This studio isn't on a trial.",
+  not_a_downgrade: "That plan isn't lower than your current one. Upgrades open once online billing is live.",
+  invalid_plan: "That plan doesn't exist.",
+  not_tenant_admin: "Only studio admins can change the plan.",
 };
 
 const trialErrorMessage = (error, fallback) =>
@@ -105,6 +108,46 @@ export const redeemTrialCode = async (tenantId, code) => {
       tenant: null,
       error: trialErrorMessage(error, "Couldn't apply that code, please try again."),
     };
+  }
+};
+
+// Moves the studio to a lower plan (Settings → Membership). Returns
+// { tenant, error } with user-facing copy, like the trial RPCs.
+export const downgradeTenantPlan = async (tenantId, plan) => {
+  try {
+    const { data, error } = await supabase.rpc("downgrade_tenant_plan", {
+      p_tenant_id: tenantId,
+      p_plan: plan,
+    });
+    if (error) throw error;
+    return { tenant: data, error: null };
+  } catch (error) {
+    console.error("Error changing plan", error);
+    return {
+      tenant: null,
+      error: trialErrorMessage(
+        error,
+        "Couldn't change your plan. Check your connection and try again."
+      ),
+    };
+  }
+};
+
+// Staff members of a studio — admins can read every membership row in
+// their own studio (user_tenant RLS, migration 001).
+export const getStaffCount = async (tenantId) => {
+  if (!tenantId) return 0;
+  try {
+    const { count, error } = await supabase
+      .from("user_tenant")
+      .select("user_id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("role", "staff");
+    if (error) throw error;
+    return count ?? 0;
+  } catch (error) {
+    console.error("Error counting staff", error);
+    return null;
   }
 };
 

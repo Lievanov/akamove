@@ -9,7 +9,8 @@ import supabase, { getUser } from "@/lib/supabase/client";
 import { LocationProvider } from "../context/LocationContext";
 import { TenantProvider, useActiveTenant } from "../context/TenantContext";
 import { OnboardingProvider } from "../context/OnboardingContext";
-import { canAccess } from "./access";
+import StaffAccessBlocked from "../components/StaffAccessBlocked";
+import { canAccess, planAllowsRole } from "./access";
 
 function LayoutContent({ children }) {
   const pathname = usePathname();
@@ -55,20 +56,25 @@ function LayoutContent({ children }) {
   const needsOnboarding =
     userChecked && !tenantsLoading && availableTenants.length === 0;
   const allowed = canAccess(pathname, activeTenant?.role);
+  const planAllowsUser = planAllowsRole(activeTenant?.plan, activeTenant?.role);
 
   useEffect(() => {
     if (needsOnboarding) router.replace("/onboarding/create-tenant");
   }, [needsOnboarding, router]);
 
   useEffect(() => {
-    if (userChecked && !tenantsLoading && activeTenant && !allowed) {
+    if (userChecked && !tenantsLoading && activeTenant && planAllowsUser && !allowed) {
       router.replace("/dashboard/access-denied");
     }
-  }, [userChecked, tenantsLoading, activeTenant, allowed, router]);
+  }, [userChecked, tenantsLoading, activeTenant, planAllowsUser, allowed, router]);
 
   // Stays on the full-page loader until the user and their tenant are
   // known, so someone about to be redirected never sees the shell flash by.
   if (!userChecked || tenantsLoading || !activeTenant) return <LoadingScreen />;
+
+  // Starter studios have no team roles: staff get one page telling them
+  // to talk to an admin, and nothing else of the dashboard.
+  if (!planAllowsUser) return <StaffAccessBlocked />;
 
   return (
     <LocationProvider>
