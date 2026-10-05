@@ -5,6 +5,7 @@ import * as RadixPopover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
 import { Check, ChevronDown, X } from "lucide-react";
 import { cn } from "./utils/cn";
+import { useFieldIds, fieldAria, FieldLabel, FieldError } from "./Field";
 
 function ComboboxCore({
   value,
@@ -19,6 +20,7 @@ function ComboboxCore({
   error,
   onSearchChange,
   searchPlaceholder = "Search...",
+  triggerProps,
 }) {
   const [open, setOpen] = useState(false);
 
@@ -58,11 +60,12 @@ function ComboboxCore({
       <RadixPopover.Root open={open} onOpenChange={setOpen}>
         <RadixPopover.Trigger asChild>
           <button
+            {...triggerProps}
             type="button"
             disabled={disabled}
             className={cn(
-              "flex min-h-10 w-full items-center justify-between gap-2 rounded-md border bg-white px-3 py-2 text-left text-sm text-brand-dark shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-pink disabled:cursor-not-allowed disabled:bg-brand-dark/5",
-              error ? "border-red-500" : "border-brand-dark/20"
+              "flex min-h-10 w-full items-center justify-between gap-2 rounded-md border bg-white px-3 py-2 text-left text-base sm:text-sm touch:min-h-11 text-brand-dark shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-pink disabled:cursor-not-allowed disabled:bg-brand-dark/5",
+              error ? "border-danger" : "border-brand-dark/20"
             )}
           >
             {multiple ? (
@@ -105,7 +108,7 @@ function ComboboxCore({
               <Command.Input
                 placeholder={searchPlaceholder}
                 onValueChange={onSearchChange}
-                className="w-full border-b border-brand-dark/10 px-3 py-2 text-sm text-brand-dark outline-none placeholder:text-brand-dark/40"
+                className="w-full border-b border-brand-dark/10 px-3 py-2 text-base text-brand-dark sm:text-sm outline-none placeholder:text-brand-dark/40"
               />
               <Command.List className="max-h-64 overflow-y-auto p-1">
                 <Command.Empty className="px-3 py-2 text-sm text-brand-dark/50">
@@ -116,11 +119,11 @@ function ComboboxCore({
                     key={getOptionValue(option)}
                     value={getOptionLabel(option)}
                     onSelect={() => handleSelect(option)}
-                    className="flex cursor-pointer items-center justify-between rounded px-3 py-2 text-sm text-brand-dark data-[selected=true]:bg-brand-pink/10"
+                    className="flex cursor-pointer items-center justify-between rounded px-3 py-2 text-sm touch:py-3 text-brand-dark data-[selected=true]:bg-brand-pink/10"
                   >
                     {getOptionLabel(option)}
                     {isSelected(option) && (
-                      <Check className="h-4 w-4 text-brand-pink" />
+                      <Check className="h-4 w-4 text-brand-pink-deep" />
                     )}
                   </Command.Item>
                 ))}
@@ -133,28 +136,34 @@ function ComboboxCore({
   );
 }
 
-function Combobox({ property, label, errors, control, required, ...rest }) {
+function Combobox({
+  property,
+  label,
+  errors,
+  control,
+  required,
+  "aria-label": ariaLabel,
+  ...rest
+}) {
   const hasError = !!errors?.[property];
+  const { id, errorId } = useFieldIds();
+  const triggerProps = {
+    ...fieldAria({ id, errorId, hasError, required: !!required }),
+    "aria-label": label ? undefined : ariaLabel,
+  };
 
-  const field = label && (
-    <label
-      className={cn(
-        "mb-1 block text-sm font-medium",
-        hasError ? "text-red-600" : "text-brand-dark"
-      )}
-    >
+  const field = (
+    <FieldLabel htmlFor={id} hasError={hasError} required={!!required}>
       {label}
-    </label>
+    </FieldLabel>
   );
 
   if (!control) {
     return (
       <div className="w-full">
         {field}
-        <ComboboxCore {...rest} error={hasError} />
-        {hasError && (
-          <p className="mt-1 text-sm text-red-600">{errors[property].message}</p>
-        )}
+        <ComboboxCore {...rest} triggerProps={triggerProps} error={hasError} />
+        <FieldError id={errorId} error={errors?.[property]} />
       </div>
     );
   }
@@ -172,6 +181,7 @@ function Combobox({ property, label, errors, control, required, ...rest }) {
         render={({ field: rhfField }) => (
           <ComboboxCore
             {...rest}
+            triggerProps={triggerProps}
             value={
               rest.multiple
                 ? options.filter((o) =>
@@ -192,9 +202,7 @@ function Combobox({ property, label, errors, control, required, ...rest }) {
           />
         )}
       />
-      {hasError && (
-        <p className="mt-1 text-sm text-red-600">{errors[property].message}</p>
-      )}
+      <FieldError id={errorId} error={errors?.[property]} />
     </div>
   );
 }

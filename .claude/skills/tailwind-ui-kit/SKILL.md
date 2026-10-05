@@ -39,7 +39,10 @@ Defined in `tailwind.config.js theme.extend`:
 | `ClassChips.jsx` | Domain-specific chip list for class assignments. Props: `colorIds`, `classes`, `router`, `periodId`, `openInNewTab`. Fixed 10-color id→hex palette. Built on `Chip.jsx`. |
 | `Alert.jsx` | Inline, non-dismissing-by-default banner. `severity`: `success`/`error`/`warning`/`info`, optional `onClose`. |
 | `Toast.jsx` | Wraps `Alert.jsx` with a self-dismiss `duration`/`onExited` contract, for post-redirect success/error banners. |
-| `PageHeader.jsx` | Simple Tailwind page-title header bar (`title` prop). |
+| `PageHeader.jsx` | Page-title header bar (`title` prop). Inside the dashboard it also renders the `?` help menu (`app/components/onboarding/HelpMenu.jsx`: replay this page's tour, glossary, setup checklist). |
+| `Drawer.jsx` | Right-side sheet: `Drawer` (root, `open`/`onOpenChange`), `DrawerTrigger`, `DrawerContent` (`title`, `description`). Built on `@radix-ui/react-dialog`, like `Dialog.jsx`. |
+| `EmptyState.jsx` | Dashed placeholder for an empty list/section: `icon` (lucide component), `title`, `description`, `action` (e.g. a `Button`). Use instead of rendering an empty `Table`. |
+| `Tour.jsx` | Guided-tour overlay: spotlights elements by `data-tour="..."` attribute with a popover per step. Props: `open`, `steps` (`[{ target?, title, body, side?, align? }]`), `onClose`. Pages don't render it directly — they call `usePageTour(TOURS.x, { ready })` from `app/context/OnboardingContext.jsx`; tour copy lives in `app/components/onboarding/tours.js`. |
 | `BackButton.jsx` | `routeTo` prop, `router.back()`-with-fallback behavior. |
 | `Table.jsx` | Plain semantic `<table>` wrappers: `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`. No built-in sorting/filtering — pages that need it implement their own sort state and a clickable `TableHead` (see `app/components/charts/ClassByPeriodPerStudentCount.jsx` for the pattern: local sort state + `lucide-react` up/down icon, no extra primitive needed). |
 | `Pagination.jsx` | Simple prev/next pager. Props: `page`, `totalItems`, `pageSize`, `onChange(page)`. |

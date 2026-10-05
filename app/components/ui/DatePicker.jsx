@@ -5,6 +5,8 @@ import * as RadixPopover from "@radix-ui/react-popover";
 import { DayPicker } from "react-day-picker";
 import { CalendarDays } from "lucide-react";
 import { cn } from "./utils/cn";
+import { formatDate } from "../utils/utils";
+import { useFieldIds, fieldAria, FieldLabel, FieldError } from "./Field";
 
 const dayPickerClassNames = {
   root: "p-3",
@@ -24,8 +26,8 @@ const dayPickerClassNames = {
   day: "h-9 w-9 text-center text-sm p-0",
   day_button:
     "h-9 w-9 rounded-md text-brand-dark hover:bg-brand-pink/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-pink",
-  today: "font-semibold text-brand-pink",
-  selected: "[&>button]:bg-brand-pink [&>button]:text-white [&>button]:hover:bg-brand-pink",
+  today: "font-semibold text-brand-pink-deep",
+  selected: "[&>button]:bg-brand-pink-deep [&>button]:text-white [&>button]:hover:bg-brand-pink-deeper",
   outside: "text-brand-dark/30",
   disabled: "text-brand-dark/20 pointer-events-none",
   dropdowns: "flex items-center gap-1",
@@ -33,22 +35,30 @@ const dayPickerClassNames = {
   dropdown: "text-sm rounded border border-brand-dark/20 px-1 py-0.5",
 };
 
-function DatePickerCore({ value, onChange, disabled, error, placeholder = "Select a date" }) {
+function DatePickerCore({
+  value,
+  onChange,
+  disabled,
+  error,
+  placeholder = "Select a date",
+  ...triggerProps
+}) {
   const [open, setOpen] = useState(false);
 
   return (
     <RadixPopover.Root open={open} onOpenChange={setOpen}>
       <RadixPopover.Trigger asChild>
         <button
+          {...triggerProps}
           type="button"
           disabled={disabled}
           className={cn(
-            "flex w-full items-center justify-between rounded-md border bg-white px-3 py-2 text-left text-sm text-brand-dark shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-pink disabled:cursor-not-allowed disabled:bg-brand-dark/5",
-            error ? "border-red-500" : "border-brand-dark/20"
+            "flex w-full items-center justify-between rounded-md border bg-white px-3 py-2 text-left text-base sm:text-sm touch:min-h-11 text-brand-dark shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-pink disabled:cursor-not-allowed disabled:bg-brand-dark/5",
+            error ? "border-danger" : "border-brand-dark/20"
           )}
         >
           <span className={value ? "" : "text-brand-dark/40"}>
-            {value ? value.toLocaleDateString() : placeholder}
+            {value ? formatDate(value) : placeholder}
           </span>
           <CalendarDays className="h-4 w-4 opacity-60" />
         </button>
@@ -89,16 +99,13 @@ function DatePicker({
   onChange,
 }) {
   const hasError = !!errors?.[property];
+  const { id, errorId } = useFieldIds();
+  const a11y = fieldAria({ id, errorId, hasError, required: !!required });
 
-  const labelEl = label && (
-    <label
-      className={cn(
-        "mb-1 block text-sm font-medium",
-        hasError ? "text-red-600" : "text-brand-dark"
-      )}
-    >
+  const labelEl = (
+    <FieldLabel htmlFor={id} hasError={hasError} required={!!required}>
       {label}
-    </label>
+    </FieldLabel>
   );
 
   if (!control) {
@@ -106,6 +113,7 @@ function DatePicker({
       <div className="w-full">
         {labelEl}
         <DatePickerCore
+          {...a11y}
           value={value}
           onChange={onChange}
           disabled={disabled}
@@ -124,6 +132,7 @@ function DatePicker({
         rules={{ ...(required && { required }) }}
         render={({ field }) => (
           <DatePickerCore
+            {...a11y}
             value={field.value}
             onChange={field.onChange}
             disabled={disabled}
@@ -132,9 +141,7 @@ function DatePicker({
           />
         )}
       />
-      {hasError && (
-        <p className="mt-1 text-sm text-red-600">{errors[property].message}</p>
-      )}
+      <FieldError id={errorId} error={errors?.[property]} />
     </div>
   );
 }

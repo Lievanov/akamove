@@ -27,18 +27,18 @@ function EditStudent() {
 
   const onSubmit = async (data) => {
     if (await updateStudent(data)) {
-      setAlert({ text: "Student updated successfully!", severity: "success" });
+      setAlert({ text: "Student updated.", severity: "success" });
       router.push(
-        `/dashboard/students?text=Student+successfully+updated!&severity=success`
+        `/dashboard/students?text=Student+updated.&severity=success`
       );
     } else
       setAlert({
-        text: "Failed to update the student, please contact web admin!",
+        text: "Couldn't update the student. Check your connection and try again.",
         severity: "error",
       });
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="form-page" />;
   return (
     <>
       {alert.text && (
@@ -51,6 +51,13 @@ function EditStudent() {
       )}
       <PageHeader
         title={`Update ${student.first_name} ${student.last_name}`}
+        breadcrumbs={[
+          { label: "Students", href: "/dashboard/students" },
+          {
+            label: `${student.first_name} ${student.last_name}`,
+            href: `/dashboard/students/${id}`,
+          },
+        ]}
       />
       <StudentForm onSubmit={onSubmit} data={student} />
     </>

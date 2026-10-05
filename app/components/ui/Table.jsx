@@ -39,13 +39,13 @@ function TableRow({ className, ...props }) {
 }
 
 function TableHead({ className, ...props }) {
-  return <th className={cn("px-4 py-3", className)} {...props} />;
+  return <th className={cn("px-3 py-3 sm:px-4", className)} {...props} />;
 }
 
 function TableCell({ className, ...props }) {
   return (
     <td
-      className={cn("px-4 py-3 text-brand-dark", className)}
+      className={cn("px-3 py-3 tabular-nums text-brand-dark sm:px-4", className)}
       {...props}
     />
   );

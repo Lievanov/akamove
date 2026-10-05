@@ -10,7 +10,7 @@ function EventForm({ onSubmit, data, isReadOnly = false }) {
   const {
     control,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
       event_name: data?.event_name ?? "",
@@ -33,11 +33,8 @@ function EventForm({ onSubmit, data, isReadOnly = false }) {
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-8">
-      <div className="my-6 rounded-lg border border-brand-dark/10 p-6 md:my-10 md:p-8">
-        <h1 className="text-center text-2xl font-semibold text-brand-dark">
-          {data ? "Event Details" : "Create New Event"}
-        </h1>
-        <form onSubmit={handleSubmit(submitForm)} className="mt-6">
+      <div className="my-6 rounded-lg border border-brand-dark/10 bg-white p-6 md:my-10 md:p-8">
+        <form onSubmit={handleSubmit(submitForm)}>
           <div className="space-y-4 border-t border-brand-dark/10 pt-6">
             <TextInput
               property="event_name"
@@ -81,8 +78,8 @@ function EventForm({ onSubmit, data, isReadOnly = false }) {
           {!isReadOnly && (
             <div className="mt-6 flex justify-end gap-2">
               <BackButton />
-              <Button type="submit">
-                {data ? "Update Event" : "Create Event"}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving…" : data ? "Update Event" : "Create Event"}
               </Button>
             </div>
           )}

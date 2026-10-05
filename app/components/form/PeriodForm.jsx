@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import Link from "next/link";
 import { ArrowUp, ArrowDown, Trash2, Plus } from "lucide-react";
 import Loading from "../Loading";
 import moment from "moment";
@@ -15,6 +16,9 @@ import { Input } from "@/app/components/ui/Input";
 import { Chip } from "@/app/components/ui/Chip";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/app/components/ui/Tabs";
 import PriceListEditor from "@/app/components/ui/PriceListEditor";
+import { Alert } from "@/app/components/ui/Alert";
+import { usePageTour } from "@/app/context/OnboardingContext";
+import { TOURS } from "@/app/components/onboarding/tours";
 import { getAllLocations } from "@/api/location/location";
 import { getAllClasses } from "@/api/class/class";
 import { getDefaultPrices } from "@/api/settings/settings";
@@ -32,7 +36,15 @@ const SectionHeader = ({ children }) => (
   </div>
 );
 
-const PeriodForm = ({ onSubmit, period, existingSchedule = [] }) => {
+const InlineLink = ({ href, children }) => (
+  <Link href={href} className="font-medium text-brand-pink-deep underline-offset-2 hover:underline">
+    {children}
+  </Link>
+);
+
+// copiedFrom: name of the period `existingSchedule` was copied from, when
+// a new period starts from the previous one's schedule.
+const PeriodForm = ({ onSubmit, period, existingSchedule = [], copiedFrom }) => {
   const [loading, setLoading] = useState(true);
   const [start_date, setStartDate] = useState(null);
   const [end_date, setEndDate] = useState(null);
@@ -42,7 +54,8 @@ const PeriodForm = ({ onSubmit, period, existingSchedule = [] }) => {
   const [schedule, setSchedule] = useState({});
   const [activeTab, setActiveTab] = useState(0);
 
-  const { control, setValue, handleSubmit, formState: { errors } } = useForm();
+  const { control, setValue, handleSubmit, formState: { errors, isSubmitting } } = useForm();
+  usePageTour(TOURS.periodForm, { ready: !loading });
 
   useEffect(() => { init(); }, []);
 
@@ -109,30 +122,35 @@ const PeriodForm = ({ onSubmit, period, existingSchedule = [] }) => {
     await onSubmit(data);
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="form" />;
 
   return (
     <div className="mx-auto max-w-3xl px-4 pb-8">
-      <div className="my-6 overflow-hidden rounded-lg border border-brand-dark/10 md:my-10">
-        <div className="bg-brand-dark px-6 py-5">
-          <h1 className="text-xl font-semibold text-white">
-            {period ? "Update Period" : "New Period"}
-          </h1>
-          <p className="mt-1 text-sm text-white/70">
+      <div className="my-6 overflow-hidden rounded-lg border border-brand-dark/10 bg-white md:my-10">
+        <div className="border-b border-brand-dark/10 bg-white px-6 py-4">
+          <p className="text-sm text-brand-dark/70">
             {period
-              ? "Edit the period details and class schedule below."
+              ? "Update the period details and class schedule below."
               : "Fill in the period details and set up the class schedule per location."}
           </p>
         </div>
 
         <form onSubmit={handleSubmit(preSubmit)}>
           <div className="px-6 py-6">
-            <div className="mb-8">
+            {!period && copiedFrom && existingSchedule.length > 0 && (
+              <Alert severity="info" className="mb-6">
+                We copied the schedule from <strong>{copiedFrom}</strong> and moved
+                each class up to its next level, so students continue where they
+                left off. Check each location&apos;s tab before creating the period.
+              </Alert>
+            )}
+
+            <div className="mb-8" data-tour="period-details">
               <SectionHeader>Period Details</SectionHeader>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <TextInput
                   property="name"
-                  label="Period Name *"
+                  label="Period Name"
                   errors={errors}
                   control={control}
                   required="Name is required"
@@ -151,15 +169,46 @@ const PeriodForm = ({ onSubmit, period, existingSchedule = [] }) => {
               </div>
             </div>
 
-            <div className="mb-8">
+            <div className="mb-8" data-tour="period-pricing">
               <SectionHeader>Pricing</SectionHeader>
-              <PriceListEditor prices={prices} onChange={setPrices} />
+              <p className="mb-3 text-sm text-brand-dark/60">
+                The price options students can pay for this period.
+                {!period && " Pre-filled from the default prices in Settings."}
+              </p>
+              <PriceListEditor
+                prices={prices}
+                onChange={setPrices}
+                emptyText="No prices yet. Add them here, or set default prices in Settings so every new period starts with them."
+              />
             </div>
 
-            {locations.length > 0 && (
+            {locations.length === 0 ? (
               <div>
                 <SectionHeader>Class Schedule</SectionHeader>
-                <div className="rounded-lg border border-brand-dark/10">
+                <Alert severity="warning">
+                  The schedule is built per location, and you don&apos;t have any
+                  active locations yet.{" "}
+                  <InlineLink href="/dashboard/locations/new">Add a location</InlineLink>{" "}
+                  first — you can create this period now and add its schedule later.
+                </Alert>
+              </div>
+            ) : (
+              <div data-tour="period-schedule">
+                <SectionHeader>Class Schedule</SectionHeader>
+                <p className="mb-3 text-sm text-brand-dark/60">
+                  One tab per active location. Add each class on the day and
+                  time it runs there.
+                </p>
+                {classes.length === 0 && (
+                  <Alert severity="warning" className="mb-3">
+                    You don&apos;t have any classes to schedule yet.{" "}
+                    <InlineLink href="/dashboard/classes/update">
+                      Create class types and levels
+                    </InlineLink>{" "}
+                    first.
+                  </Alert>
+                )}
+                <div className="rounded-lg border border-brand-dark/10 bg-white">
                   <Tabs
                     value={String(activeTab)}
                     onValueChange={(v) => setActiveTab(Number(v))}
@@ -171,7 +220,7 @@ const PeriodForm = ({ onSubmit, period, existingSchedule = [] }) => {
                           <TabsTrigger key={loc.id} value={String(i)}>
                             {loc.name}
                             {count > 0 && (
-                              <Chip label={count} className="bg-brand-pink" />
+                              <Chip label={count} tone="accent" />
                             )}
                           </TabsTrigger>
                         );
@@ -191,35 +240,40 @@ const PeriodForm = ({ onSubmit, period, existingSchedule = [] }) => {
                           </div>
                         ) : (
                           <div className="mb-2 space-y-2">
-                            <div className="flex items-center gap-2 px-1 text-xs font-semibold text-brand-dark/50">
+                            <div
+                              className="hidden items-center gap-2 px-3 text-xs font-semibold text-brand-dark/50 sm:flex"
+                              aria-hidden="true"
+                            >
                               <span className="w-36 shrink-0">Day</span>
                               <span className="w-28 shrink-0">Time</span>
                               <span className="flex-1">Class</span>
-                              <span className="w-16 shrink-0" />
-                              <span className="w-8 shrink-0" />
+                              <span className="w-[6.75rem] shrink-0" />
                             </div>
 
                             {(schedule[loc.id] ?? []).map((slot, idx) => (
                               <div
                                 key={idx}
-                                className="flex items-center gap-2 rounded-md border border-brand-dark/10 px-2 py-2 hover:border-brand-pink/40"
+                                className="grid grid-cols-2 gap-2 rounded-md border border-brand-dark/10 px-2 py-2 hover:border-brand-pink/40 sm:flex sm:items-center"
                               >
-                                <div className="w-36 shrink-0">
+                                <div className="sm:w-36 sm:shrink-0">
                                   <Select
+                                    aria-label="Day"
                                     value={slot.day_of_week}
                                     onChange={(v) => updateSlot(loc.id, idx, "day_of_week", v)}
                                     options={DAY_OPTIONS}
                                   />
                                 </div>
-                                <div className="w-28 shrink-0">
+                                <div className="sm:w-28 sm:shrink-0">
                                   <Input
+                                    aria-label="Time"
                                     type="time"
                                     value={slot.class_time}
                                     onChange={(e) => updateSlot(loc.id, idx, "class_time", e.target.value)}
                                   />
                                 </div>
-                                <div className="flex-1">
+                                <div className="col-span-2 min-w-0 sm:flex-1">
                                   <Combobox
+                                    aria-label="Class"
                                     value={classes.find((c) => c.id === slot.class_id) ?? null}
                                     onChange={(option) =>
                                       updateSlot(loc.id, idx, "class_id", option?.id ?? "")
@@ -229,7 +283,7 @@ const PeriodForm = ({ onSubmit, period, existingSchedule = [] }) => {
                                     placeholder="Search class…"
                                   />
                                 </div>
-                                <div className="flex w-16 shrink-0">
+                                <div className="col-span-2 flex justify-end sm:shrink-0">
                                   <IconButton
                                     aria-label="Move up"
                                     onClick={() => moveSlot(loc.id, idx, -1)}
@@ -244,12 +298,10 @@ const PeriodForm = ({ onSubmit, period, existingSchedule = [] }) => {
                                   >
                                     <ArrowDown className="h-4 w-4" />
                                   </IconButton>
-                                </div>
-                                <div className="w-8 shrink-0">
                                   <IconButton
-                                    aria-label="Remove slot"
+                                    aria-label="Remove class from schedule"
                                     onClick={() => removeSlot(loc.id, idx)}
-                                    className="text-red-600 hover:bg-red-50"
+                                    className="text-danger hover:bg-danger-soft"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </IconButton>
@@ -273,8 +325,8 @@ const PeriodForm = ({ onSubmit, period, existingSchedule = [] }) => {
 
           <div className="flex justify-end gap-2 border-t border-brand-dark/10 bg-brand-dark/5 px-6 py-4">
             <BackButton routeTo="/dashboard/periods" />
-            <Button type="submit">
-              {period ? "Update Period" : "Create Period"}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Saving…" : period ? "Update Period" : "Create Period"}
             </Button>
           </div>
         </form>

@@ -1,21 +1,23 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { Suspense } from "react";
+import Link from "next/link";
+import { CalendarHeart, Pencil } from "lucide-react";
 import { getEventCountFiltered, getEvents } from "@/api/events/events";
-import { useRouter } from "next/navigation";
-import { debounce } from "lodash";
-import { getUserRoleForTenant } from "@/api/tenant/tenant";
-import { getUser } from "@/lib/supabase/client";
 import { useActiveTenant } from "@/app/context/TenantContext";
-import { Pencil } from "lucide-react";
 import Loading from "@/app/components/Loading";
-import { formatDate } from "@/app/components/utils/utils";
+import { formatDate, formatMoney } from "@/app/components/utils/utils";
 import { PageHeader } from "@/app/components/ui/PageHeader";
+import { usePageTour } from "@/app/context/OnboardingContext";
+import { TOURS } from "@/app/components/onboarding/tours";
 import { Toast } from "@/app/components/ui/Toast";
-import { Button } from "@/app/components/ui/Button";
-import { IconButton } from "@/app/components/ui/IconButton";
-import { Input } from "@/app/components/ui/Input";
-import { Pagination } from "@/app/components/ui/Pagination";
+import { buttonVariants } from "@/app/components/ui/Button";
+import { iconButtonClass } from "@/app/components/ui/IconButton";
 import { Chip } from "@/app/components/ui/Chip";
+import { EmptyState } from "@/app/components/ui/EmptyState";
+import {
+  ServerTableCard,
+  rowLinkClass,
+} from "@/app/components/ui/ServerTableCard";
 import {
   Table,
   TableHeader,
@@ -24,199 +26,153 @@ import {
   TableHead,
   TableCell,
 } from "@/app/components/ui/Table";
+import { useServerTable } from "@/app/components/utils/useServerTable";
+import { useFlashAlert } from "@/app/components/utils/useFlashAlert";
+
+const fetchEvents = async ({ from, to, search }) => {
+  const [rows, count] = await Promise.all([
+    getEvents(from, to, search),
+    getEventCountFiltered(search),
+  ]);
+  return { rows, count };
+};
+
+// "YYYY-MM-DD" for today in the browser's timezone, to compare against
+// the event's date-only value.
+const todayDateOnly = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 function Events() {
-  const router = useRouter();
-  const ITEMS_PER_PAGE = 10;
+  const [alert, setAlert] = useFlashAlert();
+  const table = useServerTable({ fetchPage: fetchEvents });
+  usePageTour(TOURS.events, { ready: !table.isLoading });
+  const { activeTenant } = useActiveTenant();
+  const isAdmin = activeTenant?.role === "admin";
+  const today = todayDateOnly();
 
-  const [events, setEvents] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [accessChecked, setAccessChecked] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [page, setPage] = useState(1);
-  const [alert, setAlert] = useState({ text: "", severity: "" });
-  const { activeTenant, tenantsLoading } = useActiveTenant();
-
-  const debouncedSearch = useRef(
-    debounce(async (value) => {
-      retrieveEventList(value);
-    }, 500)
-  ).current;
-
-  useEffect(() => {
-    const urlSearchParams = new URLSearchParams(window.location.search);
-    const text = urlSearchParams.get("text");
-    const severity = urlSearchParams.get("severity");
-
-    if (text && severity) setAlert({ text, severity });
-  }, []);
-
-  useEffect(() => {
-    const checkAccess = async () => {
-      const user = await getUser();
-      if (!user?.id) {
-        router.push("/dashboard/access-denined");
-        return;
-      }
-
-      if (tenantsLoading) return;
-
-      const role = await getUserRoleForTenant(user.id, activeTenant?.id);
-      if (!["admin", "staff"].includes(role)) {
-        router.push("/dashboard/access-denined");
-        return;
-      }
-
-      setIsAdmin(role === "admin");
-      setAccessChecked(true);
-    };
-
-    checkAccess();
-  }, [router, activeTenant?.id, tenantsLoading]);
-
-  useEffect(() => {
-    if (!accessChecked) return;
-    retrieveEventList(searchTerm);
-  }, [page, accessChecked]);
-
-  useEffect(() => {
-    if (!accessChecked) return;
-    debouncedSearch(searchTerm);
-  }, [searchTerm, accessChecked]);
-
-  const retrieveEventList = async (value) => {
-    setEvents([]);
-    setLoading(true);
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE - 1;
-    const eventData = await getEvents(start, end, value ? value : "");
-    setEvents(eventData);
-    const count = await getEventCountFiltered(value ? value : "");
-    setTotalItems(count);
-    setLoading(false);
-  };
-
-  const handleChange = (event) => {
-    const { value } = event.target;
-    setSearchTerm(value);
-    handlePagination(1);
-  };
-
-  const handlePagination = (value) => {
-    setPage(value);
-  };
-
-  if (loading || !accessChecked) return <Loading />;
+  const addEventButton = isAdmin ? (
+    <Link
+      href="/dashboard/events/new"
+      data-tour="events-add"
+      className={buttonVariants()}
+    >
+      Add event
+    </Link>
+  ) : null;
 
   return (
     <>
-      <PageHeader title="Events" />
-      <div className="mx-auto mb-8 max-w-5xl px-4">
+      <PageHeader title="Events" actions={addEventButton} />
+      <div className="mx-auto mb-8 max-w-5xl px-4 pt-6">
         {alert.text && (
           <Toast
             text={alert.text}
             severity={alert.severity}
-            duration={5000}
             onExited={() => setAlert({ text: "", severity: "" })}
           />
         )}
-        <div className="my-6 flex justify-between">
-          {isAdmin && (
-            <Button onClick={() => router.push("/dashboard/events/new")}>
-              Add new event
-            </Button>
-          )}
-        </div>
-        <div className="rounded-lg border border-brand-dark/10 p-2">
-          <div className="mb-4">
-            <Input
-              id="searchTerm"
-              placeholder="Search by Event Name"
-              value={searchTerm}
-              onChange={handleChange}
-            />
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Event Name</TableHead>
-                <TableHead>Event Date</TableHead>
-                <TableHead>Event Price</TableHead>
-                <TableHead>Date of Event Price</TableHead>
-                <TableHead></TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {events.map((row) => {
-                const toLocalDateString = (date) => {
-                  const year = date.getFullYear();
-                  const month = String(date.getMonth() + 1).padStart(2, "0");
-                  const day = String(date.getDate()).padStart(2, "0");
-                  return `${year}-${month}-${day}`;
-                };
-                const eventDateOnly = (row.event_date || "").split("T")[0];
-                const todayDateOnly = toLocalDateString(new Date());
-                const isUpcomingOrToday =
-                  eventDateOnly && eventDateOnly >= todayDateOnly;
+        {table.isLoading ? (
+          <Loading variant="table" />
+        ) : table.isEmpty ? (
+          <EmptyState
+            icon={CalendarHeart}
+            title="No events yet"
+            description={
+              isAdmin
+                ? "Add a workshop, social or showcase with an advance price and a day-of price, then record payments as people sign up."
+                : "Once an admin adds an event, you can record payments for it here."
+            }
+            action={addEventButton}
+          />
+        ) : (
+          <ServerTableCard
+            table={table}
+            noun={["event", "events"]}
+            searchPlaceholder="Search by event name"
+            searchTour="events-search"
+          >
+            <Table data-tour="events-table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Event</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Advance price</TableHead>
+                  <TableHead className="hidden text-right sm:table-cell">Day-of price</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {table.rows.map((row) => {
+                  const eventDateOnly = (row.event_date || "").split("T")[0];
+                  const isUpcomingOrToday =
+                    eventDateOnly && eventDateOnly >= today;
 
-                return (
-                  <TableRow key={row.id}>
-                    <TableCell>
-                      <button
-                        type="button"
-                        className="font-medium text-brand-pink hover:underline"
-                        onClick={() => router.push(`/dashboard/events/${row.id}`)}
-                      >
-                        {row.event_name}
-                      </button>
-                    </TableCell>
-                    <TableCell>{formatDate(row.event_date)}</TableCell>
-                    <TableCell>
-                      ${row.event_price ? row.event_price.toFixed(2) : "0.00"}
-                    </TableCell>
-                    <TableCell>
-                      ${row.date_of_event_price ? Number(row.date_of_event_price).toFixed(2) : "0.00"}
-                    </TableCell>
-                    <TableCell>
-                      {isUpcomingOrToday ? (
-                        <Button
-                          variant="secondary"
-                          onClick={() => router.push(`/dashboard/events/${row.id}/payment`)}
+                  return (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <Link
+                          href={`/dashboard/events/${row.id}`}
+                          className={rowLinkClass}
                         >
-                          New Payment
-                        </Button>
-                      ) : (
-                        <Chip label="ENDED" className="bg-brand-dark/40" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <IconButton
-                        aria-label="Edit event"
-                        onClick={() => router.push(`/dashboard/events/${row.id}/edit`)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-          <div className="mt-4">
-            <Pagination
-              page={page}
-              totalItems={totalItems}
-              pageSize={ITEMS_PER_PAGE}
-              onChange={handlePagination}
-            />
-          </div>
-        </div>
+                          {row.event_name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {formatDate(row.event_date)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatMoney(row.event_price ?? 0)}
+                      </TableCell>
+                      <TableCell className="hidden text-right sm:table-cell">
+                        {formatMoney(row.date_of_event_price ?? 0)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-1">
+                          {isUpcomingOrToday ? (
+                            <Link
+                              href={`/dashboard/events/${row.id}/payment`}
+                              className={buttonVariants({
+                                variant: "outline",
+                                size: "sm",
+                              })}
+                            >
+                              Record payment
+                            </Link>
+                          ) : (
+                            <Chip label="Ended" tone="neutral" />
+                          )}
+                          <Link
+                            href={`/dashboard/events/${row.id}/edit`}
+                            aria-label={`Update ${row.event_name}`}
+                            className={iconButtonClass}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Link>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </ServerTableCard>
+        )}
       </div>
     </>
   );
 }
 
-export default Events;
+export default function EventsPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <Events />
+    </Suspense>
+  );
+}

@@ -26,17 +26,17 @@ function UpdateLocation() {
     const success = await updateLocation({ id: locationId, ...data });
     if (success) {
       router.push(
-        `/dashboard/locations?text=Location+successfully+updated!&severity=success`
+        `/dashboard/locations?text=Location+updated.&severity=success`
       );
     } else {
       setAlert({
-        text: "Failed to update location, please contact web admin!",
+        text: "Couldn't update the location. Check your connection and try again.",
         severity: "error",
       });
     }
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="form-page" />;
 
   return (
     <>
@@ -48,7 +48,7 @@ function UpdateLocation() {
           onExited={() => setAlert({ text: "", severity: "" })}
         />
       )}
-      <PageHeader title="Update Location" />
+      <PageHeader title="Update location" breadcrumbs={[{ label: "Locations", href: "/dashboard/locations" }]} />
       <LocationForm onSubmit={onSubmit} location={location} />
     </>
   );

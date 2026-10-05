@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { Suspense, useEffect, useState } from "react";
+import { CheckCheck, StickyNote } from "lucide-react";
 import { PageHeader } from "@/app/components/ui/PageHeader";
 import { Toast } from "@/app/components/ui/Toast";
 import { Checkbox } from "@/app/components/ui/Checkbox";
-import { Pagination } from "@/app/components/ui/Pagination";
+import { EmptyState } from "@/app/components/ui/EmptyState";
+import { ServerTableCard } from "@/app/components/ui/ServerTableCard";
+import { Tabs, TabsList, TabsTrigger } from "@/app/components/ui/Tabs";
 import {
   Table,
   TableHeader,
@@ -15,18 +17,45 @@ import {
   TableCell,
 } from "@/app/components/ui/Table";
 import Loading from "@/app/components/Loading";
-import { getNotes, updateNote, getPreviousNotes } from "@/api/notes/notes";
+import {
+  getNotes,
+  updateNote,
+  getPreviousNotes,
+  getPendingNotesCount,
+  getCompletedNotesCount,
+} from "@/api/notes/notes";
 import { formatDatestamp } from "@/app/components/utils/utils";
+import { useServerTable } from "@/app/components/utils/useServerTable";
+import { notifyNotesChanged } from "@/app/components/notes/notesEvents";
 import { cn } from "@/app/components/ui/utils/cn";
 
-function NotesTable({ notes, onToggle }) {
+const fetchPending = async ({ from, to }) => {
+  const [rows, count] = await Promise.all([
+    getNotes(from, to),
+    getPendingNotesCount(),
+  ]);
+  return { rows, count };
+};
+
+const fetchDone = async ({ from, to }) => {
+  const [rows, count] = await Promise.all([
+    getPreviousNotes(from, to),
+    getCompletedNotesCount(),
+  ]);
+  return { rows, count };
+};
+
+function NotesTable({ notes, onToggle, pendingIds }) {
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead></TableHead>
+          <TableHead className="w-10">
+            <span className="sr-only">Done</span>
+          </TableHead>
           <TableHead>Note</TableHead>
-          <TableHead>Created At</TableHead>
+          <TableHead className="hidden md:table-cell">Added by</TableHead>
+          <TableHead className="hidden sm:table-cell">Added</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -35,18 +64,27 @@ function NotesTable({ notes, onToggle }) {
             <TableCell>
               <Checkbox
                 checked={note.is_completed}
-                onCheckedChange={(checked) => onToggle(note.id, checked)}
+                disabled={pendingIds.has(note.id)}
+                onCheckedChange={(checked) => onToggle(note, checked)}
+                label={
+                  <span className="sr-only">
+                    {note.is_completed ? "Mark as pending" : "Mark as done"}
+                  </span>
+                }
               />
             </TableCell>
             <TableCell
               className={cn(
-                "w-3/5 whitespace-normal break-words",
-                note.is_completed && "text-brand-dark/40 line-through"
+                "w-3/5 whitespace-pre-line break-words",
+                note.is_completed && "text-brand-dark/50"
               )}
             >
               {note.note}
             </TableCell>
-            <TableCell>{formatDatestamp(note.created_at)}</TableCell>
+            <TableCell className="hidden md:table-cell">{note.created_by ?? "—"}</TableCell>
+            <TableCell className="hidden whitespace-nowrap sm:table-cell">
+              {formatDatestamp(note.created_at)}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -56,136 +94,110 @@ function NotesTable({ notes, onToggle }) {
 
 function Notes() {
   const [alert, setAlert] = useState({ text: "", severity: "" });
-  const [notes, setNotes] = useState([]);
-  const [previousNotes, setPreviousNotes] = useState([]);
-  const [previousNoteCount, setPreviousNoteCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [noteCount, setNoteCount] = useState(0);
-  const [page, setPage] = useState(1);
-  const [previousPage, setPreviousPage] = useState(1);
-  const [previousOpen, setPreviousOpen] = useState(false);
-  const ITEMS_PER_PAGE = 10;
+  const [tab, setTab] = useState("pending");
+  const [doneCount, setDoneCount] = useState(null);
+  const [pendingIds, setPendingIds] = useState(new Set());
+  const pending = useServerTable({ fetchPage: fetchPending, syncUrl: false });
+  const done = useServerTable({ fetchPage: fetchDone, syncUrl: false });
+  const table = tab === "pending" ? pending : done;
 
   useEffect(() => {
-    retrieveNotes(0, 10);
-    retrievePreviousNotes(0, 10);
-    setLoading(false);
-  }, []);
+    if (done.status === "ready") setDoneCount(done.total);
+  }, [done.status, done.total]);
 
-  const retrieveNotes = async (startPage, endPage) => {
-    const data = await getNotes(startPage, endPage);
-    setNoteCount(data.length);
-    setNotes(data);
-  };
-
-  const retrievePreviousNotes = async (startPage, endPage) => {
-    const data = await getPreviousNotes(startPage, endPage);
-    setPreviousNotes(data);
-    setPreviousNoteCount(data.length);
-  };
-
-  const handlePagination = (value) => {
-    setPage(value);
-    const start = (value - 1) * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE - 1;
-    retrieveNotes(start, end);
-  };
-
-  const handlePreviousPagination = (value) => {
-    setPreviousPage(value);
-    const start = (value - 1) * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE - 1;
-    retrievePreviousNotes(start, end);
-  };
-
-  const handleChange = async (id, value) => {
-    if (await updateNote(id, value)) {
-      // Update both notes and previousNotes arrays
-      setNotes(
-        notes.map((note) =>
-          note.id === id ? { ...note, is_completed: value } : note
-        )
-      );
-      setPreviousNotes(
-        previousNotes.map((note) =>
-          note.id === id ? { ...note, is_completed: value } : note
-        )
-      );
-
-      setAlert({ text: "Note updated", severity: "success" });
-
-      // Refresh both tables to reflect the changes
-      const start = (page - 1) * ITEMS_PER_PAGE;
-      const end = start + ITEMS_PER_PAGE - 1;
-      retrieveNotes(start, end);
-
-      const prevStart = (previousPage - 1) * ITEMS_PER_PAGE;
-      const prevEnd = prevStart + ITEMS_PER_PAGE - 1;
-      retrievePreviousNotes(prevStart, prevEnd);
+  const handleToggle = async (note, value) => {
+    setPendingIds((prev) => new Set(prev).add(note.id));
+    const ok = await updateNote(note.id, value);
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(note.id);
+      return next;
+    });
+    if (ok) {
+      setAlert({
+        text: value ? "Marked as done." : "Moved back to pending.",
+        severity: "success",
+      });
+      pending.refresh();
+      done.refresh();
+      notifyNotesChanged();
     } else {
-      setAlert({ text: "Error updating note", severity: "error" });
+      setAlert({
+        text: "Couldn't update the note. Check your connection and try again.",
+        severity: "error",
+      });
     }
   };
-
-  if (loading) {
-    return <Loading />;
-  }
 
   return (
     <>
       <PageHeader title="Notes" />
-      <div className="mx-auto mb-8 max-w-5xl px-4">
+      <div className="mx-auto mb-8 max-w-5xl px-4 pt-6">
         {alert.text && (
           <Toast
             text={alert.text}
             severity={alert.severity}
-            duration={5000}
             onExited={() => setAlert({ text: "", severity: "" })}
           />
         )}
-        <div className="my-6 rounded-lg border border-brand-dark/10 p-2">
-          <NotesTable notes={notes} onToggle={handleChange} />
-          <div className="mt-4">
-            <Pagination
-              page={page}
-              totalItems={noteCount}
-              pageSize={ITEMS_PER_PAGE}
-              onChange={handlePagination}
-            />
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-brand-dark/10">
-          <button
-            type="button"
-            onClick={() => setPreviousOpen((prev) => !prev)}
-            className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-brand-dark"
-          >
-            Previous Notes
-            <ChevronDown
-              className={cn(
-                "h-4 w-4 transition-transform",
-                previousOpen && "rotate-180"
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="pending">
+              Pending
+              {pending.status === "ready" && (
+                <span className="rounded-full bg-brand-dark/10 px-2 text-xs">
+                  {pending.total}
+                </span>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="done">
+              Done
+              {doneCount !== null && (
+                <span className="rounded-full bg-brand-dark/10 px-2 text-xs">
+                  {doneCount}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {table.isLoading ? (
+          <Loading variant="table" />
+        ) : table.isEmpty ? (
+          tab === "pending" ? (
+            <EmptyState
+              icon={CheckCheck}
+              title="All caught up"
+              description="No pending notes. Use “Add note” in the sidebar to leave one for the team."
             />
-          </button>
-          {previousOpen && (
-            <div className="border-t border-brand-dark/10 p-2">
-              <NotesTable notes={previousNotes} onToggle={handleChange} />
-              <div className="mt-4">
-                <Pagination
-                  page={previousPage}
-                  totalItems={previousNoteCount}
-                  pageSize={ITEMS_PER_PAGE}
-                  onChange={handlePreviousPagination}
-                />
-              </div>
-            </div>
-          )}
-        </div>
+          ) : (
+            <EmptyState
+              icon={StickyNote}
+              title="No finished notes yet"
+              description="Notes you mark as done move here."
+            />
+          )
+        ) : (
+          <ServerTableCard
+            table={table}
+            noun={tab === "pending" ? ["pending note", "pending notes"] : ["done note", "done notes"]}
+          >
+            <NotesTable
+              notes={table.rows}
+              onToggle={handleToggle}
+              pendingIds={pendingIds}
+            />
+          </ServerTableCard>
+        )}
       </div>
     </>
   );
 }
 
-export default Notes;
+export default function NotesPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <Notes />
+    </Suspense>
+  );
+}

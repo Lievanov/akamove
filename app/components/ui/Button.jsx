@@ -8,15 +8,15 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-brand-pink text-white hover:bg-brand-pink/90",
+        primary: "bg-brand-pink-deep text-white hover:bg-brand-pink-deeper",
         secondary: "bg-brand-dark text-brand-cream hover:bg-brand-dark/90",
         outline:
           "border border-brand-dark/20 text-brand-dark hover:bg-brand-dark/5",
         ghost: "text-brand-dark hover:bg-brand-dark/5",
       },
       size: {
-        sm: "h-8 px-3 text-sm",
-        md: "h-10 px-4 text-sm",
+        sm: "h-8 px-3 text-sm touch:h-10",
+        md: "h-10 px-4 text-sm touch:h-11",
         lg: "h-12 px-6 text-base",
       },
     },

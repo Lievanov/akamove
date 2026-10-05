@@ -4,6 +4,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
   DialogActions,
 } from "@/app/components/ui/Dialog";
 import { Button } from "@/app/components/ui/Button";
@@ -62,13 +63,13 @@ export default function UseClassDialog({ open, onClose, lesson, onSuccess }) {
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
       <DialogContent>
-        <DialogTitle>Use Class</DialogTitle>
-        <p className="mb-4 text-sm text-brand-dark/70">
+        <DialogTitle>Record a lesson</DialogTitle>
+        <DialogDescription>
           This will record one lesson used.{" "}
           {remaining >= 0
-            ? `${remaining} lesson(s) will remain.`
+            ? `${remaining} ${remaining === 1 ? "lesson" : "lessons"} will remain.`
             : "No lessons remaining."}
-        </p>
+        </DialogDescription>
         <div className="space-y-4">
           <Combobox
             label="Instructor"
@@ -78,10 +79,14 @@ export default function UseClassDialog({ open, onClose, lesson, onSuccess }) {
             getOptionLabel={(o) => o.name}
           />
           <div>
-            <label className="mb-1 block text-sm font-medium text-brand-dark">
-              Lesson Date
+            <label
+              htmlFor="lesson-date"
+              className="mb-1 block text-sm font-medium text-brand-dark"
+            >
+              Lesson date
             </label>
             <Input
+              id="lesson-date"
               type="date"
               value={lessonDate}
               onChange={(e) => setLessonDate(e.target.value)}
@@ -96,7 +101,7 @@ export default function UseClassDialog({ open, onClose, lesson, onSuccess }) {
             onClick={handleConfirm}
             disabled={loading || !selectedInstructor || !lessonDate || remaining < 0}
           >
-            {loading ? "Saving..." : "Confirm"}
+            {loading ? "Saving…" : "Record lesson"}
           </Button>
         </DialogActions>
       </DialogContent>

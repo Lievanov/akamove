@@ -244,7 +244,7 @@ const PaymentForm = ({
     }
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="form" />;
 
   const renderPaymentAmountField = () => (
     <TextInput
@@ -283,14 +283,18 @@ const PaymentForm = ({
       />
       {creditTaken > 0 ? (
         <div className="w-full">
-          <label className="mb-1 block text-sm font-medium text-red-600">
-            Credit Taken
+          <label
+            htmlFor="credit-applied"
+            className="mb-1 block text-sm font-medium text-brand-dark"
+          >
+            Credit applied
           </label>
           <Input
+            id="credit-applied"
             value={formatMoney(creditTaken)}
             readOnly
             prefix="$"
-            className="border-transparent bg-transparent font-bold text-red-600 shadow-none"
+            className="border-transparent bg-transparent font-bold text-brand-dark shadow-none"
           />
         </div>
       ) : null}
@@ -333,11 +337,8 @@ const PaymentForm = ({
         </DialogContent>
       </Dialog>
 
-      <div className="my-6 rounded-lg border border-brand-dark/10 p-6 md:my-10 md:p-8">
-        <h1 className="text-center text-2xl font-semibold text-brand-dark">
-          {payment ? "Update" : "New"} Payment
-        </h1>
-        <form onSubmit={handleSubmit(preSubmit)} className="mt-6">
+      <div className="my-6 rounded-lg border border-brand-dark/10 bg-white p-6 md:my-10 md:p-8">
+        <form onSubmit={handleSubmit(preSubmit)}>
           <div className="space-y-4 border-t border-brand-dark/10 pt-6">
             {!isEventPayment && period?.name && (
               <p className="pb-1 text-base text-brand-dark/60">

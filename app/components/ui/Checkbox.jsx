@@ -8,7 +8,7 @@ function CheckboxCore({ checked, onCheckedChange, disabled, label, className }) 
   return (
     <label
       className={cn(
-        "inline-flex items-center gap-2 text-sm text-brand-dark",
+        "inline-flex items-center gap-2 text-sm text-brand-dark touch:min-h-11 touch:min-w-11 touch:justify-center",
         disabled && "cursor-not-allowed opacity-50",
         className
       )}

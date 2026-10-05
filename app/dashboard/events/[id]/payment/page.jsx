@@ -9,9 +9,6 @@ import Loading from "@/app/components/Loading";
 import { Toast } from "@/app/components/ui/Toast";
 import { PageHeader } from "@/app/components/ui/PageHeader";
 import { getLatestPeriod } from "@/api/period/period";
-import { getUserRoleForTenant } from "@/api/tenant/tenant";
-import { getUser } from "@/lib/supabase/client";
-import { useActiveTenant } from "@/app/context/TenantContext";
 
 function EventPayment() {
   const router = useRouter();
@@ -21,40 +18,10 @@ function EventPayment() {
   const [event, setEvent] = useState({});
   const [period, setPeriod] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [checkingAccess, setCheckingAccess] = useState(true);
-  const { activeTenant, tenantsLoading } = useActiveTenant();
 
   useEffect(() => {
-    let isActive = true;
-    const checkAccess = async () => {
-      const user = await getUser();
-      if (!user?.id) {
-        router.replace("/");
-        return;
-      }
-
-      if (tenantsLoading) return;
-
-      const role = await getUserRoleForTenant(user.id, activeTenant?.id);
-      if (!["admin", "staff"].includes(role)) {
-        router.replace("/dashboard/access-denined");
-        return;
-      }
-
-      if (isActive) setCheckingAccess(false);
-    };
-
-    checkAccess();
-
-    return () => {
-      isActive = false;
-    };
-  }, [router, activeTenant?.id, tenantsLoading]);
-
-  useEffect(() => {
-    if (checkingAccess) return;
     getEvent();
-  }, [checkingAccess]);
+  }, []);
 
   const getEvent = async () => {
     const [eventData, latestPeriod] = await Promise.all([
@@ -80,14 +47,14 @@ function EventPayment() {
       router.push("/dashboard/events");
     } else {
       setAlert({
-        text: "Failed to add payment, please contact web admin!",
+        text: "Couldn't add the payment. Check your connection and try again.",
         severity: "error",
       });
       setIsSubmitting(false);
     }
   };
 
-  if (checkingAccess || loading) return <Loading />;
+  if (loading) return <Loading variant="form-page" />;
 
   return (
     <>
@@ -99,7 +66,10 @@ function EventPayment() {
           onExited={() => setAlert({ text: "", severity: "" })}
         />
       )}
-      <PageHeader title="Add Event Payment" />
+      <PageHeader
+        title={event.event_name ? `Record payment: ${event.event_name}` : "Record event payment"}
+        breadcrumbs={[{ label: "Events", href: "/dashboard/events" }]}
+      />
       <PaymentForm
         onSubmit={onSubmit}
         period={period || { id: "", name: "", prices: [] }}

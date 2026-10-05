@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import moment from "moment";
 import { useForm } from "react-hook-form";
 import { formatPhoneNumber } from "../utils/utils";
@@ -10,12 +9,11 @@ import { BackButton } from "@/app/components/ui/BackButton";
 import { Button } from "@/app/components/ui/Button";
 
 function StudentForm({ onSubmit, data, isReadOnly = false }) {
-  const router = useRouter();
   const {
     control,
     handleSubmit,
     setValue,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm();
 
   const [studentId, setId] = useState(null);
@@ -63,15 +61,12 @@ function StudentForm({ onSubmit, data, isReadOnly = false }) {
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-8">
-      <div className="my-6 rounded-lg border border-brand-dark/10 p-6 md:my-10 md:p-8">
-        <h1 className="text-center text-2xl font-semibold text-brand-dark">
-          {studentId ? "Update" : "New"} Student
-        </h1>
-        <form onSubmit={handleSubmit(preSubmit)} className="mt-6">
+      <div className="my-6 rounded-lg border border-brand-dark/10 bg-white p-6 md:my-10 md:p-8">
+        <form onSubmit={handleSubmit(preSubmit)}>
           <div className="space-y-4 border-t border-brand-dark/10 pt-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <TextInput
-                label="First Name*"
+                label="First Name"
                 property="first_name"
                 errors={errors}
                 control={control}
@@ -80,7 +75,7 @@ function StudentForm({ onSubmit, data, isReadOnly = false }) {
                 disabled={isReadOnly}
               />
               <TextInput
-                label="Last Name*"
+                label="Last Name"
                 property="last_name"
                 errors={errors}
                 control={control}
@@ -139,37 +134,14 @@ function StudentForm({ onSubmit, data, isReadOnly = false }) {
               />
             </div>
           </div>
-          <div className="mt-6 flex flex-wrap justify-end gap-2">
-            <BackButton />
-            {!isReadOnly && (
-              <Button type="submit" autoFocus>
-                {studentId ? "Update" : "Create"} Student
+          {!isReadOnly && (
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <BackButton />
+              <Button type="submit" autoFocus disabled={isSubmitting}>
+                {isSubmitting ? "Saving…" : studentId ? "Update student" : "Create student"}
               </Button>
-            )}
-            {isReadOnly && (
-              <>
-                <Button
-                  autoFocus
-                  onClick={() => router.push(`/dashboard/students/${studentId}/edit`)}
-                >
-                  Go To Update Student
-                </Button>
-                <Button
-                  onClick={() =>
-                    router.push(`/dashboard/private-lessons/new?studentId=${studentId}`)
-                  }
-                >
-                  Create Private Lesson
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => router.push(`/dashboard/payments/${studentId}`)}
-                >
-                  Payment
-                </Button>
-              </>
-            )}
-          </div>
+            </div>
+          )}
         </form>
       </div>
     </div>

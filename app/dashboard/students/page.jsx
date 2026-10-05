@@ -1,8 +1,7 @@
 "use client";
-import { Suspense, useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { debounce } from "lodash";
-import { Pencil } from "lucide-react";
+import { Suspense } from "react";
+import Link from "next/link";
+import { Pencil, Users } from "lucide-react";
 import {
   getStudentsBylastPayment,
   getStudentCountFiltered,
@@ -10,11 +9,12 @@ import {
 import Loading from "@/app/components/Loading";
 import { Toast } from "@/app/components/ui/Toast";
 import { PageHeader } from "@/app/components/ui/PageHeader";
-import { Button } from "@/app/components/ui/Button";
-import { IconButton } from "@/app/components/ui/IconButton";
-import { Input } from "@/app/components/ui/Input";
-import { Pagination } from "@/app/components/ui/Pagination";
+import { usePageTour } from "@/app/context/OnboardingContext";
+import { TOURS } from "@/app/components/onboarding/tours";
+import { buttonVariants } from "@/app/components/ui/Button";
+import { iconButtonClass } from "@/app/components/ui/IconButton";
 import { ClassChips } from "@/app/components/ui/ClassChips";
+import { EmptyState } from "@/app/components/ui/EmptyState";
 import {
   Table,
   TableHeader,
@@ -24,157 +24,67 @@ import {
   TableCell,
 } from "@/app/components/ui/Table";
 import { formatPhoneNumber } from "@/app/components/utils/utils";
+import { useServerTable } from "@/app/components/utils/useServerTable";
+import { useFlashAlert } from "@/app/components/utils/useFlashAlert";
+import { ServerTableCard, rowLinkClass } from "@/app/components/ui/ServerTableCard";
+
+const fetchStudents = async ({ from, to, search }) => {
+  const [rows, count] = await Promise.all([
+    getStudentsBylastPayment(from, to, search),
+    getStudentCountFiltered(search),
+  ]);
+  return { rows, count };
+};
+
+// The view repeats a class once per payment; show each class once.
+const getUniqueClassesForRow = (row) => {
+  const classNames = row?.class_info;
+  const classTypes = row?.class_type;
+
+  if (
+    !Array.isArray(classNames) ||
+    !Array.isArray(classTypes) ||
+    classNames.length !== classTypes.length
+  ) {
+    return { class_info: classNames, class_type: classTypes };
+  }
+
+  const seen = new Set();
+  const uniqueNames = [];
+  const uniqueTypes = [];
+
+  for (let i = 0; i < classNames.length; i += 1) {
+    const name = classNames[i];
+    if (!name) continue;
+    const key = String(name).trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniqueNames.push(name);
+    uniqueTypes.push(classTypes[i]);
+  }
+
+  return { class_info: uniqueNames, class_type: uniqueTypes };
+};
 
 function Students() {
-  const ITEMS_PER_PAGE = 10;
+  const [alert, setAlert] = useFlashAlert();
+  const table = useServerTable({ fetchPage: fetchStudents });
+  usePageTour(TOURS.students, { ready: !table.isLoading });
 
-  const router = useRouter();
-  const [students, setStudents] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [alert, setAlert] = useState({ text: "", severity: "" });
-
-  const retrieveStudentList = async (value) => {
-    setStudents([]);
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE - 1;
-    const studentData = await getStudentsBylastPayment(
-      start,
-      end,
-      value ? value : ""
-    );
-    setStudents(studentData);
-    const count = await getStudentCountFiltered(value ? value : "");
-    setTotalItems(count);
-    setLoading(false);
-  };
-
-  const debouncedSearch = useRef(
-    debounce(async (value) => {
-      retrieveStudentList(value);
-    }, 500)
-  ).current;
-
-  useEffect(() => {
-    const urlSearchParams = new URLSearchParams(window.location.search);
-    const text = urlSearchParams.get("text");
-    const severity = urlSearchParams.get("severity");
-    const pageParam = urlSearchParams.get("page");
-    const searchParam = urlSearchParams.get("search");
-
-    if (text && severity) setAlert({ text, severity });
-
-    // Initialize search term from query params if present
-    if (searchParam) {
-      setSearchTerm(searchParam);
-    }
-
-    // Initialize page from query params if present
-    if (pageParam) {
-      const pageNumber = parseInt(pageParam, 10);
-      if (pageNumber > 0) {
-        setPage(pageNumber);
-        // Trigger data fetch for the specified page
-        retrieveStudentList(searchParam || "");
-      }
-    } else {
-      // If no page param, load initial data
-      retrieveStudentList(searchParam || "");
-    }
-  }, []);
-
-  useEffect(() => {
-    debouncedSearch(searchTerm);
-  }, [searchTerm]);
-
-  useEffect(() => {
-    retrieveStudentList(searchTerm);
-  }, [page]);
-
-  const handleChange = (event) => {
-    const { value } = event.target;
-
-    // Update query string with search term immediately using the current input value
-    const url = new URL(window.location.href);
-    if (value.trim() === "") {
-      // Remove search parameter if empty
-      url.searchParams.delete("search");
-    } else {
-      // Add search parameter
-      url.searchParams.set("search", value);
-    }
-
-    // Always reset to page 1 when searching
-    url.searchParams.delete("page");
-
-    // Update URL without page reload
-    router.push(url.pathname + url.search, { scroll: false });
-
-    // Update state and trigger search
-    setSearchTerm(value);
-    handlePagination(1);
-  };
-
-  const handlePagination = (value) => {
-    setPage(value);
-
-    // Update query string for pages 2 and above, preserving search term
-    const url = new URL(window.location.href);
-
-    // Preserve search term if present
-    if (searchTerm.trim() !== "") {
-      url.searchParams.set("search", searchTerm);
-    }
-
-    if (value === 1) {
-      // Remove page parameter for page 1
-      url.searchParams.delete("page");
-    } else {
-      // Add page parameter for pages 2+
-      url.searchParams.set("page", value.toString());
-    }
-
-    // Update URL without page reload
-    router.push(url.pathname + url.search, { scroll: false });
-  };
-
-  const getUniqueClassesForRow = (row) => {
-    const classNames = Array.isArray(row?.class_info) ? row.class_info : row?.class_info;
-    const classTypes = Array.isArray(row?.class_type) ? row.class_type : row?.class_type;
-
-    if (!Array.isArray(classNames) || !Array.isArray(classTypes)) {
-      return { class_info: row?.class_info, class_type: row?.class_type };
-    }
-    if (classNames.length !== classTypes.length) {
-      return { class_info: row?.class_info, class_type: row?.class_type };
-    }
-
-    const seen = new Set();
-    const uniqueNames = [];
-    const uniqueTypes = [];
-
-    for (let i = 0; i < classNames.length; i += 1) {
-      const name = classNames[i];
-      const type = classTypes[i];
-      if (!name) continue;
-      const key = String(name).trim().toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      uniqueNames.push(name);
-      uniqueTypes.push(type);
-    }
-
-    return { class_info: uniqueNames, class_type: uniqueTypes };
-  };
-
-  if (loading) return <Loading />;
+  const addStudentButton = (
+    <Link
+      href="/dashboard/students/new"
+      data-tour="students-add"
+      className={buttonVariants()}
+    >
+      Add student
+    </Link>
+  );
 
   return (
     <>
-      <PageHeader title="Students" />
-      <div className="mx-auto mb-8 max-w-5xl px-4">
+      <PageHeader title="Students" actions={addStudentButton} />
+      <div className="mx-auto mb-8 max-w-5xl px-4 pt-6">
         {alert.text && (
           <Toast
             text={alert.text}
@@ -183,95 +93,87 @@ function Students() {
             onExited={() => setAlert({ text: "", severity: "" })}
           />
         )}
-        <div className="my-6">
-          <div className="flex justify-between pb-1">
-            <Button onClick={() => router.push("/dashboard/students/new")}>
-              Add new student
-            </Button>
-          </div>
-          <p className="text-sm text-brand-dark/70">
-            Total Students: {totalItems}
-          </p>
-        </div>
-        <div className="rounded-lg border border-brand-dark/10 p-2">
-          <div className="mb-4">
-            <Input
-              id="searchTerm"
-              placeholder="Search by Name or Phone Number"
-              value={searchTerm}
-              onChange={handleChange}
-            />
-          </div>
-          <Table>
+
+        {table.isLoading ? (
+          <Loading variant="table" />
+        ) : table.isEmpty ? (
+          <EmptyState
+            icon={Users}
+            title="No students yet"
+            description="Add your first student to start recording payments and enrolling them in classes."
+            action={addStudentButton}
+          />
+        ) : (
+          <ServerTableCard
+            table={table}
+            noun={["student", "students"]}
+            searchPlaceholder="Search by name or phone number"
+            noMatchesHint="Check the spelling, or search by phone number instead."
+            searchTour="students-search"
+          >
+          <Table data-tour="students-table">
             <TableHeader>
               <TableRow>
-                <TableHead>First Name</TableHead>
-                <TableHead>Last Name</TableHead>
-                <TableHead>Phone Number</TableHead>
-                <TableHead>Current Classes</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead></TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead className="hidden md:table-cell">Current classes</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {students.map((row) => {
+              {table.rows.map((row) => {
                 const unique = getUniqueClassesForRow(row);
+                const fullName = [row.first_name, row.last_name]
+                  .filter(Boolean)
+                  .join(" ");
                 return (
                   <TableRow key={row.id}>
                     <TableCell>
-                      <button
-                        type="button"
-                        className="font-medium text-brand-pink hover:underline"
-                        onClick={() =>
-                          router.push(`/dashboard/students/${row.id}`)
-                        }
+                      <Link
+                        href={`/dashboard/students/${row.id}`}
+                        className={rowLinkClass}
                       >
-                        {row.first_name}
-                      </button>
+                        {fullName || "Unnamed student"}
+                      </Link>
                     </TableCell>
-                    <TableCell>{row.last_name}</TableCell>
-                    <TableCell>{formatPhoneNumber(row.phone)}</TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {formatPhoneNumber(row.phone) || "—"}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <ClassChips
                         colorIds={unique.class_type}
                         classes={unique.class_info}
-                        router={router}
-                      />
+                          />
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="secondary"
-                        onClick={() =>
-                          router.push(`/dashboard/payments/${row.id}`)
-                        }
-                      >
-                        Payment
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <IconButton
-                        aria-label="Edit student"
-                        onClick={() =>
-                          router.push(`/dashboard/students/${row.id}/edit`)
-                        }
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </IconButton>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link
+                          href={`/dashboard/payments/${row.id}`}
+                          className={buttonVariants({
+                            variant: "outline",
+                            size: "sm",
+                          })}
+                        >
+                          Record payment
+                        </Link>
+                        <Link
+                          href={`/dashboard/students/${row.id}/edit`}
+                          aria-label={`Update ${fullName || "student"}`}
+                          className={iconButtonClass}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Link>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
               })}
             </TableBody>
           </Table>
-          <div className="mt-4">
-            <Pagination
-              page={page}
-              totalItems={totalItems}
-              pageSize={ITEMS_PER_PAGE}
-              onChange={handlePagination}
-            />
-          </div>
-        </div>
+          </ServerTableCard>
+        )}
       </div>
     </>
   );

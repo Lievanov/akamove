@@ -56,6 +56,34 @@ both tables.
 
 10. `010_settings_tenant_pk.sql` — restructures `settings`' primary key from `key` alone to `(tenant_id, key)`, enforces `tenant_id NOT NULL`, and cuts over its RLS (drops the old tenant-blind admin policies; the tenant-scoped admin policies from 004 already cover it). Paired with the `api/settings/settings.js` update (every read/write now includes `tenant_id`) — run only after that app code is deployed, same ordering as 008.
 
+## Phase 7 — free trial
+
+11. `011_tenant_trial.sql` — 14-day Pro Studio trial: `tenant.trial_status/trial_started_at/trial_ends_at/trial_code`, `trial_code` (extension codes) and `trial_usage` (one trial per user) tables, the new `create_tenant_and_admin(name, plan, trial, trial_code)` signature (replaces 006's), `redeem_trial_code(tenant_id, code)`, and an hourly `pg_cron` job running `expire_due_trials()` (moves ended trials to Starter). Also narrows `authenticated`'s UPDATE grant on `tenant` to `name, slug, plan, updated_at`, so admins can't rewrite their own trial dates. Deploy the matching app code (onboarding page, `api/tenant/tenant.js`) at the same time — the old two-arg RPC is dropped.
+
+Trial admin, from the SQL editor:
+
+```sql
+-- Create a 2-month code (optionally: max_redemptions, expires_at, note)
+insert into trial_code (code, trial_days, note) values ('MOVE60', 60, 'Studios we talk to');
+
+-- Retire a code
+update trial_code set active = false where code = 'MOVE60';
+
+-- Hand-set a studio's trial end (also revives an expired trial)
+update tenant
+set trial_ends_at = trial_started_at + interval '60 days',
+    trial_status = 'active', plan = 'pro studio'
+where id = '<tenant id>';
+```
+
+## Phase 8 — onboarding
+
+12. `012_profile_tours_seen.sql` — `profiles.tours_seen jsonb` (ids of the dashboard page tours a user has finished or skipped). Deploy with the onboarding app code (`app/context/OnboardingContext.jsx`); until it runs, tours never start on their own (the "?" menu can still replay them).
+
+13. `013_class_type_unique_name.sql` — unique index on `class_type (tenant_id, lower(btrim(name)))` so a studio can't have two class types with the same name. Aborts and lists any existing duplicates, which must be merged by hand first (repoint `class.class_type`, delete the extra).
+
+The setup checklist's "dismissed" flag needs no migration — it's the `onboarding_checklist_dismissed` key in the existing tenant-scoped `settings` table.
+
 ## After running any migration
 
 - Run its paired verification file, if one exists, and confirm every

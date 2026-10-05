@@ -10,6 +10,7 @@ import { createEventPayment } from "@/api/events/event_payment";
 import { getLatestPeriod } from "@/api/period/period";
 import { Toast } from "@/app/components/ui/Toast";
 import { PageHeader } from "@/app/components/ui/PageHeader";
+import { useFlashAlert } from "@/app/components/utils/useFlashAlert";
 import ClassesByPayment from "@/app/components/lists/ClassesByPayment";
 
 function NewPayment() {
@@ -19,7 +20,7 @@ function NewPayment() {
   const [period, setPeriod] = useState({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [alert, setAlert] = useState({ text: "", severity: "" });
+  const [alert, setAlert] = useFlashAlert();
 
   useEffect(() => {
     getStudent();
@@ -71,28 +72,28 @@ function NewPayment() {
           // Immediately disable further submissions
           setSubmitting(true); // Keep it true to prevent any further clicks
           router.push(
-            `/dashboard/students?text=Payment+for+${student.first_name}+${student.last_name}+was+successful&severity=success`
+            `/dashboard/students?text=Payment+recorded+for+${student.first_name}+${student.last_name}.&severity=success`
           );
           return;
         }
       }
 
       setAlert({
-        text: "Failed to create the payment, please contact web admin!",
+        text: "Couldn't create the payment. Check your connection and try again.",
         severity: "error",
       });
       setSubmitting(false); // Allow retry on failure
     } catch (error) {
       console.error("Payment submission error:", error);
       setAlert({
-        text: "An error occurred while processing your payment. Please try again.",
+        text: "Couldn't record the payment. Check your connection and try again.",
         severity: "error",
       });
       setSubmitting(false); // Allow retry on error
     }
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="form-page" />;
 
   return (
     <>
@@ -105,7 +106,14 @@ function NewPayment() {
         />
       )}
       <PageHeader
-        title={`New Payment for ${student.first_name} ${student.last_name}`}
+        title={`Record payment: ${student.first_name} ${student.last_name}`}
+        breadcrumbs={[
+          { label: "Students", href: "/dashboard/students" },
+          {
+            label: `${student.first_name} ${student.last_name}`,
+            href: `/dashboard/students/${studentId}`,
+          },
+        ]}
       />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="lg:col-span-7">

@@ -4,9 +4,31 @@ import { getActiveTenantId } from "@/lib/tenant/activeTenant";
 const DEFAULT_PRICES_KEY = "default_prices";
 const STUDIO_FEE_KEY = "private_lesson_studio_fee";
 const TIMEZONE_KEY = "timezone";
+const CHECKLIST_DISMISSED_KEY = "onboarding_checklist_dismissed";
 
 // IANA timezone used to decide "day-of" event pricing and other date logic.
 export const DEFAULT_TIMEZONE = "America/Indiana/Indianapolis";
+
+export const TIMEZONE_OPTIONS = [
+  { value: "America/Indiana/Indianapolis", label: "Eastern - Indiana (Indianapolis)" },
+  { value: "America/New_York", label: "Eastern (New York)" },
+  { value: "America/Chicago", label: "Central (Chicago)" },
+  { value: "America/Denver", label: "Mountain (Denver)" },
+  { value: "America/Phoenix", label: "Mountain - No DST (Phoenix)" },
+  { value: "America/Los_Angeles", label: "Pacific (Los Angeles)" },
+  { value: "America/Anchorage", label: "Alaska (Anchorage)" },
+  { value: "Pacific/Honolulu", label: "Hawaii (Honolulu)" },
+];
+
+// The browser's timezone when it's one we offer, so onboarding can
+// pre-select it; otherwise the app default.
+export const guessTimezone = () => {
+  try {
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (TIMEZONE_OPTIONS.some((option) => option.value === browserTz)) return browserTz;
+  } catch {}
+  return DEFAULT_TIMEZONE;
+};
 
 export const getSetting = async (key) => {
   try {
@@ -66,3 +88,9 @@ export const getTimezone = async () => {
 
 export const saveTimezone = async (timezone) =>
   upsertSetting(TIMEZONE_KEY, timezone || DEFAULT_TIMEZONE);
+
+export const getChecklistDismissed = async () =>
+  (await getSetting(CHECKLIST_DISMISSED_KEY)) === true;
+
+export const saveChecklistDismissed = async (dismissed) =>
+  upsertSetting(CHECKLIST_DISMISSED_KEY, !!dismissed);

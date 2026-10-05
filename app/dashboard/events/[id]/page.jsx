@@ -26,15 +26,15 @@ function ViewEvent() {
 
   const onSubmit = async (data) => {
     if (await updateEvent(id, data)) {
-      setAlert({ text: "Event updated successfully!", severity: "success" });
+      setAlert({ text: "Event updated.", severity: "success" });
     } else
       setAlert({
-        text: "Failed to update the event, please contact web admin!",
+        text: "Couldn't update the event. Check your connection and try again.",
         severity: "error",
       });
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="form-page" />;
   return (
     <>
       {alert.text && (
@@ -45,7 +45,7 @@ function ViewEvent() {
           onExited={() => setAlert({ text: "", severity: "" })}
         />
       )}
-      <PageHeader title={`Event: ${event.event_name}`} />
+      <PageHeader title={event.event_name} breadcrumbs={[{ label: "Events", href: "/dashboard/events" }]} />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <EventForm onSubmit={onSubmit} data={event} isReadOnly={true} />
         <EventPaymentsList eventId={id} eventName={event.event_name} />

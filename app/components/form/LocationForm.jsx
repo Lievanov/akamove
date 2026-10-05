@@ -11,7 +11,7 @@ const LocationForm = ({ onSubmit, location }) => {
     control,
     setValue,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm({ defaultValues: { is_active: true } });
 
   useEffect(() => {
@@ -27,15 +27,12 @@ const LocationForm = ({ onSubmit, location }) => {
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-8">
-      <div className="my-6 rounded-lg border border-brand-dark/10 p-6 md:my-10 md:p-8">
-        <h1 className="text-center text-2xl font-semibold text-brand-dark">
-          {location ? "Update" : "New"} Location
-        </h1>
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-6">
+      <div className="my-6 rounded-lg border border-brand-dark/10 bg-white p-6 md:my-10 md:p-8">
+        <form onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-4 border-t border-brand-dark/10 pt-6">
             <TextInput
               property="name"
-              label="Location Name*"
+              label="Location Name"
               errors={errors}
               control={control}
               required="Name is required"
@@ -43,7 +40,7 @@ const LocationForm = ({ onSubmit, location }) => {
             />
             <TextInput
               property="address"
-              label="Address*"
+              label="Address"
               errors={errors}
               control={control}
               required="Address is required"
@@ -74,12 +71,18 @@ const LocationForm = ({ onSubmit, location }) => {
               placeholder="Parking available on the street. Enter through the side door."
               rows={3}
             />
-            <Switch property="is_active" label="Active" control={control} />
+            <div>
+              <Switch property="is_active" label="Active" control={control} />
+              <p className="mt-1 text-xs text-brand-dark/50">
+                Only active locations get a schedule tab in new periods.
+                Turning a location off keeps its past schedules and history.
+              </p>
+            </div>
           </div>
           <div className="mt-6 flex justify-end gap-2">
             <BackButton routeTo="/dashboard/locations" />
-            <Button type="submit" autoFocus>
-              {location ? "Update" : "Create"} Location
+            <Button type="submit" autoFocus disabled={isSubmitting}>
+              {isSubmitting ? "Saving…" : `${location ? "Update" : "Create"} Location`}
             </Button>
           </div>
         </form>

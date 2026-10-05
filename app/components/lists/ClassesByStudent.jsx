@@ -5,7 +5,8 @@ import { Pencil } from "lucide-react";
 import Loading from "../Loading";
 import { getPaymentsByStudentId } from "@/api/payment/payment";
 import { ClassChips } from "@/app/components/ui/ClassChips";
-import { IconButton } from "@/app/components/ui/IconButton";
+import { iconButtonClass } from "@/app/components/ui/IconButton";
+import Link from "next/link";
 import {
   Table,
   TableHeader,
@@ -14,7 +15,7 @@ import {
   TableHead,
   TableCell,
 } from "@/app/components/ui/Table";
-import { formatDate } from "@/app/components/utils/utils";
+import { formatDate, formatMoney } from "@/app/components/utils/utils";
 
 function ClassesByStudent({ studentId }) {
   const router = useRouter();
@@ -32,14 +33,14 @@ function ClassesByStudent({ studentId }) {
     setLoading(false);
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="table" />;
 
   return (
-    <div className="rounded-lg border border-brand-dark/10 p-6">
+    <div className="rounded-lg border border-brand-dark/10 bg-white p-6">
       <h2 className="text-center text-xl font-semibold text-brand-dark">
         Classes By Period
       </h2>
-      <div className="mt-4 rounded-lg border border-brand-dark/10 p-2">
+      <div className="mt-4 rounded-lg border border-brand-dark/10 bg-white p-2">
         <Table>
           <TableHeader>
             <TableRow>
@@ -54,14 +55,13 @@ function ClassesByStudent({ studentId }) {
             {payments.map((row) => (
               <TableRow key={row.id}>
                 <TableCell>
-                  <IconButton
-                    aria-label="Edit payment"
-                    onClick={() =>
-                      router.push(`/dashboard/payments/edit/${row.id}`)
-                    }
+                  <Link
+                    href={`/dashboard/payments/edit/${row.id}`}
+                    aria-label="Update payment"
+                    className={iconButtonClass}
                   >
                     <Pencil className="h-4 w-4" />
-                  </IconButton>
+                  </Link>
                 </TableCell>
                 <TableCell>
                   <ClassChips
@@ -72,7 +72,7 @@ function ClassesByStudent({ studentId }) {
                 </TableCell>
                 <TableCell>{formatDate(row.created_at)}</TableCell>
                 <TableCell>{row.period_name}</TableCell>
-                <TableCell>${row.payment_amount.toFixed(2)}</TableCell>
+                <TableCell>{formatMoney(row.payment_amount)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

@@ -13,6 +13,7 @@ function NewPeriod() {
   const router = useRouter();
   const [alert, setAlert] = useState({ text: "", severity: "" });
   const [previousSchedule, setPreviousSchedule] = useState([]);
+  const [previousPeriodName, setPreviousPeriodName] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,6 +32,7 @@ function NewPeriod() {
           class_id: nextClassMap[row.class_id] ?? row.class_id,
         }));
         setPreviousSchedule(advanced);
+        setPreviousPeriodName(latestPeriod.name);
       }
       setLoading(false);
     };
@@ -41,18 +43,18 @@ function NewPeriod() {
     const periodId = await createPeriod(periodData);
     if (!periodId) {
       setAlert({
-        text: "Failed to create a new Period, please contact web admin!",
+        text: "Couldn't create the period. Check your connection and try again.",
         severity: "error",
       });
       return;
     }
     await upsertScheduleForPeriod(periodId, schedule);
     router.push(
-      `/dashboard/periods?text=New+Period+was+successfully+created!&severity=success`
+      `/dashboard/periods?text=Period+created.&severity=success`
     );
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="form-page" />;
 
   return (
     <>
@@ -64,8 +66,12 @@ function NewPeriod() {
           onExited={() => setAlert({ text: "", severity: "" })}
         />
       )}
-      <PageHeader title="New Period" />
-      <PeriodForm onSubmit={onSubmit} existingSchedule={previousSchedule} />
+      <PageHeader title="New period" breadcrumbs={[{ label: "Periods", href: "/dashboard/periods" }]} />
+      <PeriodForm
+        onSubmit={onSubmit}
+        existingSchedule={previousSchedule}
+        copiedFrom={previousPeriodName}
+      />
     </>
   );
 }

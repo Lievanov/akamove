@@ -1,18 +1,21 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense } from "react";
+import Link from "next/link";
+import { MapPin, Pencil } from "lucide-react";
 import { getLocations, getLocationCount } from "@/api/location/location";
-import { getUserRoleForTenant } from "@/api/tenant/tenant";
-import { getUser } from "@/lib/supabase/client";
-import { useActiveTenant } from "@/app/context/TenantContext";
-import { Pencil } from "lucide-react";
 import Loading from "@/app/components/Loading";
 import { Toast } from "@/app/components/ui/Toast";
 import { PageHeader } from "@/app/components/ui/PageHeader";
-import { Button } from "@/app/components/ui/Button";
-import { IconButton } from "@/app/components/ui/IconButton";
+import { usePageTour } from "@/app/context/OnboardingContext";
+import { TOURS } from "@/app/components/onboarding/tours";
+import { buttonVariants } from "@/app/components/ui/Button";
+import { iconButtonClass } from "@/app/components/ui/IconButton";
 import { Chip } from "@/app/components/ui/Chip";
-import { Pagination } from "@/app/components/ui/Pagination";
+import { EmptyState } from "@/app/components/ui/EmptyState";
+import {
+  ServerTableCard,
+  rowLinkClass,
+} from "@/app/components/ui/ServerTableCard";
 import {
   Table,
   TableHeader,
@@ -21,132 +24,118 @@ import {
   TableHead,
   TableCell,
 } from "@/app/components/ui/Table";
+import { formatPhoneNumber } from "@/app/components/utils/utils";
+import { useServerTable } from "@/app/components/utils/useServerTable";
+import { useFlashAlert } from "@/app/components/utils/useFlashAlert";
+
+const fetchLocations = async ({ from, to }) => {
+  const [rows, count] = await Promise.all([
+    getLocations(from, to),
+    getLocationCount(),
+  ]);
+  return { rows, count };
+};
 
 function Locations() {
-  const ITEMS_PER_PAGE = 10;
-  const router = useRouter();
-  const [locations, setLocations] = useState([]);
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [accessChecked, setAccessChecked] = useState(false);
-  const [page, setPage] = useState(1);
-  const [alert, setAlert] = useState({ text: "", severity: "" });
-  const { activeTenant, tenantsLoading } = useActiveTenant();
+  const [alert, setAlert] = useFlashAlert();
+  const table = useServerTable({ fetchPage: fetchLocations });
+  usePageTour(TOURS.locations, { ready: !table.isLoading });
 
-  useEffect(() => {
-    const urlSearchParams = new URLSearchParams(window.location.search);
-    const text = urlSearchParams.get("text");
-    const severity = urlSearchParams.get("severity");
-    if (text && severity) setAlert({ text, severity });
-  }, []);
-
-  useEffect(() => {
-    const checkAccess = async () => {
-      const user = await getUser();
-      if (!user?.id) {
-        router.push("/dashboard/access-denined");
-        return;
-      }
-      if (tenantsLoading) return;
-      const role = await getUserRoleForTenant(user.id, activeTenant?.id);
-      if (role !== "admin") {
-        router.push("/dashboard/access-denined");
-        return;
-      }
-      setAccessChecked(true);
-    };
-    checkAccess();
-  }, [router, activeTenant?.id, tenantsLoading]);
-
-  useEffect(() => {
-    if (!accessChecked) return;
-    retrieveLocationList();
-  }, [page, accessChecked]);
-
-  const retrieveLocationList = async () => {
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE - 1;
-    const [data, count] = await Promise.all([
-      getLocations(start, end),
-      getLocationCount(),
-    ]);
-    setLocations(data);
-    setTotalItems(count);
-    setLoading(false);
-  };
-
-  if (loading || !accessChecked) return <Loading />;
+  const addLocationButton = (
+    <Link
+      href="/dashboard/locations/new"
+      data-tour="locations-add"
+      className={buttonVariants()}
+    >
+      Add location
+    </Link>
+  );
 
   return (
     <>
-      <PageHeader title="Locations" />
-      <div className="mx-auto mb-8 max-w-5xl px-4">
+      <PageHeader title="Locations" actions={addLocationButton} />
+      <div className="mx-auto mb-8 max-w-5xl px-4 pt-6">
         {alert.text && (
           <Toast
             text={alert.text}
             severity={alert.severity}
-            duration={5000}
             onExited={() => setAlert({ text: "", severity: "" })}
           />
         )}
-        <div className="my-6 flex justify-between">
-          <Button onClick={() => router.push("/dashboard/locations/new")}>
-            Add new Location
-          </Button>
-        </div>
-        <div className="rounded-lg border border-brand-dark/10 p-2">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Capacity</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Edit</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {locations.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>{row.name}</TableCell>
-                  <TableCell>{row.address}</TableCell>
-                  <TableCell>{row.phone ?? "—"}</TableCell>
-                  <TableCell>{row.capacity ?? "—"}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={row.is_active ? "Active" : "Inactive"}
-                      className={
-                        row.is_active ? "bg-green-600" : "bg-brand-dark/40"
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <IconButton
-                      aria-label="Edit location"
-                      onClick={() =>
-                        router.push(`/dashboard/locations/${row.id}`)
-                      }
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <div className="mt-4">
-            <Pagination
-              page={page}
-              totalItems={totalItems}
-              pageSize={ITEMS_PER_PAGE}
-              onChange={setPage}
-            />
+        {table.isLoading ? (
+          <Loading variant="table" />
+        ) : table.isEmpty ? (
+          <EmptyState
+            icon={MapPin}
+            title="No locations yet"
+            description="Add the studio space(s) where you teach. You need at least one location before you can build a period's class schedule."
+            action={addLocationButton}
+          />
+        ) : (
+          <div data-tour="locations-table">
+            <ServerTableCard table={table} noun={["location", "locations"]}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="hidden md:table-cell">Address</TableHead>
+                    <TableHead className="hidden sm:table-cell">Phone</TableHead>
+                    <TableHead className="hidden text-right lg:table-cell">Capacity</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {table.rows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <Link
+                          href={`/dashboard/locations/${row.id}`}
+                          className={rowLinkClass}
+                        >
+                          {row.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">{row.address || "—"}</TableCell>
+                      <TableCell className="hidden whitespace-nowrap sm:table-cell">
+                        {formatPhoneNumber(row.phone) || "—"}
+                      </TableCell>
+                      <TableCell className="hidden text-right lg:table-cell">
+                        {row.capacity ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={row.is_active ? "Active" : "Inactive"}
+                          tone={row.is_active ? "success" : "neutral"}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Link
+                          href={`/dashboard/locations/${row.id}`}
+                          aria-label={`Update ${row.name}`}
+                          className={iconButtonClass}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ServerTableCard>
           </div>
-        </div>
+        )}
       </div>
     </>
   );
 }
 
-export default Locations;
+export default function LocationsPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <Locations />
+    </Suspense>
+  );
+}

@@ -2,7 +2,7 @@
 import { Controller } from "react-hook-form";
 import { emailRegex } from "../utils/utils";
 import { Input } from "./Input";
-import { cn } from "./utils/cn";
+import { useFieldIds, fieldAria, FieldLabel, FieldError } from "./Field";
 
 function TextInput({
   property,
@@ -23,18 +23,13 @@ function TextInput({
   rules,
 }) {
   const hasError = !!errors[property];
+  const { id, errorId } = useFieldIds();
 
   return (
     <div className="w-full">
-      <label
-        htmlFor={property}
-        className={cn(
-          "mb-1 block text-sm font-medium",
-          hasError ? "text-red-600" : "text-brand-dark"
-        )}
-      >
+      <FieldLabel htmlFor={id} hasError={hasError} required={!!required}>
         {label}
-      </label>
+      </FieldLabel>
       <Controller
         name={property}
         control={control}
@@ -50,7 +45,7 @@ function TextInput({
         }}
         render={({ field }) => (
           <Input
-            id={property}
+            {...fieldAria({ id, errorId, hasError, required: !!required })}
             placeholder={disabled ? "" : placeholder}
             disabled={disabled}
             type={type}
@@ -68,11 +63,7 @@ function TextInput({
           />
         )}
       />
-      {hasError && (
-        <p className="mt-1 text-sm text-red-600">
-          {errors[property].message}
-        </p>
-      )}
+      <FieldError id={errorId} error={errors[property]} />
     </div>
   );
 }

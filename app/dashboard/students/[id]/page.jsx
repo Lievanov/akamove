@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStudentById, updateStudent } from "@/api/student/students";
@@ -7,12 +8,14 @@ import StudentForm from "@/app/components/form/StudentForm";
 import Loading from "@/app/components/Loading";
 import { Toast } from "@/app/components/ui/Toast";
 import { PageHeader } from "@/app/components/ui/PageHeader";
+import { useFlashAlert } from "@/app/components/utils/useFlashAlert";
+import { buttonVariants } from "@/app/components/ui/Button";
 import ClassesByStudent from "@/app/components/lists/ClassesByStudent";
 
 function ViewStudent() {
   const { id } = useParams();
   const [loading, setLoading] = useState(true);
-  const [alert, setAlert] = useState({ text: "", severity: "" });
+  const [alert, setAlert] = useFlashAlert();
   const [student, setStudent] = useState({});
 
   useEffect(() => {
@@ -26,15 +29,15 @@ function ViewStudent() {
 
   const onSubmit = async (data) => {
     if (await updateStudent(data)) {
-      setAlert({ text: "Student updated successfully!", severity: "success" });
+      setAlert({ text: "Student updated.", severity: "success" });
     } else
       setAlert({
-        text: "Failed to update the student, please contact web admin!",
+        text: "Couldn't update the student. Check your connection and try again.",
         severity: "error",
       });
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="form-page" />;
   return (
     <>
       {alert.text && (
@@ -46,7 +49,30 @@ function ViewStudent() {
         />
       )}
       <PageHeader
-        title={`Student ${student.first_name} ${student.last_name}`}
+        title={`${student.first_name} ${student.last_name}`}
+        breadcrumbs={[{ label: "Students", href: "/dashboard/students" }]}
+        actions={
+          <>
+            <Link
+              href={`/dashboard/students/${id}/edit`}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              Update
+            </Link>
+            <Link
+              href={`/dashboard/private-lessons/new?studentId=${id}`}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              Add private lesson
+            </Link>
+            <Link
+              href={`/dashboard/payments/${id}`}
+              className={buttonVariants()}
+            >
+              Record payment
+            </Link>
+          </>
+        }
       />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <StudentForm onSubmit={onSubmit} data={student} isReadOnly={true} />

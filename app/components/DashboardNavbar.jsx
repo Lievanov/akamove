@@ -1,30 +1,36 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
-import { LogOut, FileText, MapPin, Building2 } from "lucide-react";
-import Loading from "./Loading";
+import * as RadixDialog from "@radix-ui/react-dialog";
+import { LogOut, FilePlus2, MapPin, Building2, Menu, X } from "lucide-react";
 import supabase, { getUser } from "@/lib/supabase/client";
 import { getPendingNotesCount } from "@/api/notes/notes";
 import { getAllLocations } from "@/api/location/location";
 import GlobalNotes from "./notes/GlobalNotes";
+import { NOTES_CHANGED_EVENT } from "./notes/notesEvents";
+import TrialStatusButton from "./TrialStatusButton";
 import { useSelectedLocation } from "@/app/context/LocationContext";
 import { useActiveTenant } from "@/app/context/TenantContext";
 import { Select } from "@/app/components/ui/Select";
 import { Chip } from "@/app/components/ui/Chip";
 import { cn } from "@/app/components/ui/utils/cn";
+import { iconButtonClass } from "@/app/components/ui/IconButton";
+import { useMediaQuery } from "@/app/components/utils/useMediaQuery";
+import { canAccess, isInSection } from "@/app/dashboard/access";
 
 const ALL_TABS = [
-  { label: "Main",            path: "/dashboard" },
+  { label: "Today",           path: "/dashboard" },
   { label: "Students",        path: "/dashboard/students" },
   { label: "Classes",         path: "/dashboard/classes" },
   { label: "Payments",        path: "/dashboard/payments" },
   { label: "Events",          path: "/dashboard/events" },
-  { label: "Periods",         path: "/dashboard/periods",          adminOnly: true, dividerBefore: true },
-  { label: "Instructors",     path: "/dashboard/instructors",      adminOnly: true },
-  { label: "Private Lessons", path: "/dashboard/private-lessons",  adminOnly: true },
-  { label: "Locations",       path: "/dashboard/locations",        adminOnly: true },
-  { label: "Settings",        path: "/dashboard/settings",         adminOnly: true },
+  { label: "Periods",         path: "/dashboard/periods",          dividerBefore: true },
+  { label: "Instructors",     path: "/dashboard/instructors" },
+  { label: "Private Lessons", path: "/dashboard/private-lessons" },
+  { label: "Locations",       path: "/dashboard/locations" },
+  { label: "Settings",        path: "/dashboard/settings" },
   { label: "Notes",           path: "/dashboard/notes",            badgeKey: "pendingNotes" },
 ];
 
@@ -42,10 +48,22 @@ const DashboardNavbar = () => {
     useActiveTenant();
 
   const role = activeTenant?.role ?? null;
-  const isAdmin = role === "admin";
+  // Below lg the sidebar becomes a top bar + slide-out menu.
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     callGetUser();
+  }, []);
+
+  useEffect(() => {
+    const refreshBadge = () => getPendingNotesCount().then(setPendingNotesCount);
+    window.addEventListener(NOTES_CHANGED_EVENT, refreshBadge);
+    return () => window.removeEventListener(NOTES_CHANGED_EVENT, refreshBadge);
   }, []);
 
   const callGetUser = async () => {
@@ -80,22 +98,37 @@ const DashboardNavbar = () => {
     router.push("/");
   };
 
+  // Same rules the layout enforces (app/dashboard/access.js), so the nav
+  // never offers a link that would bounce to "access restricted".
   const visibleTabs = useMemo(
-    () => (isAdmin ? ALL_TABS : ALL_TABS.filter((t) => !t.adminOnly)),
-    [isAdmin]
+    () => ALL_TABS.filter((t) => canAccess(t.path, role)),
+    [role]
   );
 
   const badges = { pendingNotes: pendingNotesCount };
 
-  if (loading || tenantsLoading) return <Loading />;
+  if (loading || tenantsLoading) {
+    return isDesktop ? (
+      <div className="h-full w-[200px] shrink-0 border-r border-brand-dark/10 bg-white" />
+    ) : (
+      <div className="h-14 shrink-0 border-b border-brand-dark/10 bg-white" />
+    );
+  }
 
-  return (
-    <div className="flex h-screen w-[200px] shrink-0 flex-col border-r border-brand-dark/10 bg-white">
+  const panel = (
+    <>
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-brand-dark/10 px-4 py-3">
-        <Image src="/images/am_logo.png" width={28} height={28} alt="aka Move Logo" />
-        <span className="text-sm font-semibold text-brand-dark">aka Move</span>
+        <Image src="/images/am_logo.png" width={28} height={28} alt="aka Move" />
+        <span className="flex-1 text-sm font-semibold text-brand-dark">aka Move</span>
+        {!isDesktop && (
+          <RadixDialog.Close aria-label="Close menu" className={cn(iconButtonClass, "-mr-2")}>
+            <X className="h-5 w-5" />
+          </RadixDialog.Close>
+        )}
       </div>
+
+      <TrialStatusButton />
 
       {/* Tenant switcher */}
       {availableTenants.length > 1 && (
@@ -107,6 +140,7 @@ const DashboardNavbar = () => {
             </span>
           </div>
           <Select
+            aria-label="Studio"
             value={activeTenant?.id ?? ""}
             onChange={handleTenantChange}
             placeholder="Select studio…"
@@ -117,7 +151,7 @@ const DashboardNavbar = () => {
 
       {/* Location selector */}
       {locations.length > 0 && (
-        <div className="border-b border-brand-dark/10 px-3 py-3">
+        <div data-tour="nav-location-picker" className="border-b border-brand-dark/10 px-3 py-3">
           <div className="mb-1.5 flex items-center gap-1">
             <MapPin className="h-3.5 w-3.5 text-brand-dark/50" />
             <span className="text-xs font-semibold tracking-wide text-brand-dark/50">
@@ -125,6 +159,7 @@ const DashboardNavbar = () => {
             </span>
           </div>
           <Select
+            aria-label="Location"
             value={selectedLocation?.id ?? ""}
             onChange={(value) => {
               const loc = locations.find((l) => l.id === value) ?? null;
@@ -137,10 +172,10 @@ const DashboardNavbar = () => {
       )}
 
       {/* Nav items */}
-      <div className="flex-1 overflow-y-auto pt-2">
+      <nav aria-label="Dashboard" className="flex-1 overflow-y-auto pt-2">
         {visibleTabs.map((tab) => {
           const count = tab.badgeKey ? badges[tab.badgeKey] : 0;
-          const isActive = pathname === tab.path;
+          const isActive = isInSection(pathname, tab.path);
 
           return (
             <div key={tab.path}>
@@ -151,45 +186,51 @@ const DashboardNavbar = () => {
                   <hr className="flex-1 border-brand-dark/10" />
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => router.push(tab.path)}
+              <Link
+                href={tab.path}
+                data-tour={`nav-${tab.path.split("/")[2] ?? "main"}`}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "mx-1 mb-1 flex w-[calc(100%-8px)] items-center justify-between rounded-md px-3 py-2 text-left text-sm",
+                  "mx-1 mb-1 flex w-[calc(100%-8px)] items-center justify-between rounded-md px-3 py-2 text-left text-sm touch:py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-pink focus-visible:ring-offset-1",
                   isActive
-                    ? "bg-brand-pink text-white"
+                    ? "bg-brand-pink-deep font-medium text-white"
                     : "text-brand-dark hover:bg-brand-dark/5"
                 )}
               >
                 <span>{tab.label}</span>
                 {count > 0 && (
                   <Chip
-                    label={count}
-                    className={isActive ? "bg-white/20" : "bg-red-600"}
+                    label={
+                      <>
+                        {count}
+                        <span className="sr-only"> pending</span>
+                      </>
+                    }
+                    tone={isActive ? null : "accent"}
+                    className={cn("px-2 py-0.5", isActive && "bg-white/25 text-white")}
                   />
                 )}
-              </button>
+              </Link>
             </div>
           );
         })}
-      </div>
+      </nav>
 
       {/* Add Note */}
       {currentUser && (
         <>
-          <GlobalNotes
-            currentUser={currentUser}
-            open={addNoteOpen}
-            onClose={() => setAddNoteOpen(false)}
-          />
           <div className="px-2 pb-2">
             <button
               type="button"
-              onClick={() => setAddNoteOpen(true)}
-              className="flex w-full items-center gap-2 rounded-md border border-dashed border-red-300 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+              data-tour="add-note"
+              onClick={() => {
+                setMenuOpen(false);
+                setAddNoteOpen(true);
+              }}
+              className="flex w-full items-center gap-2 rounded-md border border-brand-dark/15 px-3 py-2 text-sm font-medium touch:py-3 text-brand-dark hover:bg-brand-dark/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-pink"
             >
-              <FileText className="h-4 w-4" />
-              Add Note
+              <FilePlus2 className="h-4 w-4 text-brand-pink-deep" />
+              Add note
             </button>
           </div>
         </>
@@ -203,13 +244,67 @@ const DashboardNavbar = () => {
         <button
           type="button"
           onClick={handleLogout}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-brand-dark/60 hover:bg-brand-dark/5"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-brand-dark/70 touch:py-3 hover:bg-brand-dark/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-pink"
         >
           <LogOut className="h-4 w-4" />
-          Logout
+          Log out
         </button>
       </div>
-    </div>
+    </>
+  );
+
+  const noteDialog = currentUser && (
+    <GlobalNotes
+      currentUser={currentUser}
+      open={addNoteOpen}
+      onClose={() => setAddNoteOpen(false)}
+    />
+  );
+
+  if (isDesktop) {
+    return (
+      <aside className="flex h-full w-[200px] shrink-0 flex-col border-r border-brand-dark/10 bg-white">
+        {panel}
+        {noteDialog}
+      </aside>
+    );
+  }
+
+  return (
+    <RadixDialog.Root open={menuOpen} onOpenChange={setMenuOpen}>
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-brand-dark/10 bg-white px-2">
+        <RadixDialog.Trigger
+          aria-label="Open menu"
+          className={cn(iconButtonClass, "h-11 w-11")}
+        >
+          <Menu className="h-5 w-5" />
+        </RadixDialog.Trigger>
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-pink"
+        >
+          <Image src="/images/am_logo.png" width={28} height={28} alt="" />
+          <span className="text-sm font-semibold text-brand-dark">aka Move</span>
+        </Link>
+        {selectedLocation && (
+          <span className="ml-auto mr-2 flex min-w-0 items-center gap-1 text-xs text-brand-dark/60">
+            <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span className="truncate">{selectedLocation.name}</span>
+          </span>
+        )}
+      </div>
+      <RadixDialog.Portal>
+        <RadixDialog.Overlay className="fixed inset-0 z-40 bg-brand-dark/40" />
+        <RadixDialog.Content
+          aria-describedby={undefined}
+          className="fixed inset-y-0 left-0 z-50 flex w-[min(18rem,85vw)] flex-col bg-white shadow-xl focus:outline-none"
+        >
+          <RadixDialog.Title className="sr-only">Menu</RadixDialog.Title>
+          {panel}
+        </RadixDialog.Content>
+      </RadixDialog.Portal>
+      {noteDialog}
+    </RadixDialog.Root>
   );
 };
 

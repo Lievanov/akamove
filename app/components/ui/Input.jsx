@@ -11,8 +11,8 @@ const Input = forwardRef(
         type={type}
         rows={rows}
         className={cn(
-          "block w-full rounded-md border bg-white px-3 py-2 text-sm text-brand-dark shadow-sm transition-colors placeholder:text-brand-dark/40 focus:outline-none focus:ring-2 focus:ring-brand-pink disabled:cursor-not-allowed disabled:bg-brand-dark/5",
-          error ? "border-red-500" : "border-brand-dark/20",
+          "block w-full rounded-md border bg-white px-3 py-2 text-base sm:text-sm touch:min-h-11 text-brand-dark shadow-sm transition-colors placeholder:text-brand-dark/40 focus:outline-none focus:ring-2 focus:ring-brand-pink disabled:cursor-not-allowed disabled:bg-brand-dark/5",
+          error ? "border-danger" : "border-brand-dark/20",
           prefix && "pl-7",
           suffix && "pr-7",
           className

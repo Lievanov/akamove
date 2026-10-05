@@ -41,17 +41,17 @@ function UpdatePeriod() {
 
     if (updated && scheduleUpdated) {
       router.push(
-        `/dashboard/periods?text=Period+successfully+updated!&severity=success`
+        `/dashboard/periods?text=Period+updated.&severity=success`
       );
     } else {
       setAlert({
-        text: "Failed to update Period, please contact web admin!",
+        text: "Couldn't update the period. Check your connection and try again.",
         severity: "error",
       });
     }
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="form-page" />;
 
   return (
     <>
@@ -63,7 +63,7 @@ function UpdatePeriod() {
           onExited={() => setAlert({ text: "", severity: "" })}
         />
       )}
-      <PageHeader title="Update Period" />
+      <PageHeader title="Update period" breadcrumbs={[{ label: "Periods", href: "/dashboard/periods" }]} />
 
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pb-8 lg:grid-cols-12">
         <div className="lg:col-span-7">
@@ -74,7 +74,7 @@ function UpdatePeriod() {
           />
         </div>
         <div className="flex flex-col gap-4 pt-6 lg:col-span-5">
-          <div className="rounded-lg border border-brand-dark/10 p-4">
+          <div className="rounded-lg border border-brand-dark/10 bg-white p-4">
             <StudentCountByPeriod periodId={periodId} />
           </div>
           <ClassByPeriodPerStudentCount periodId={periodId} />

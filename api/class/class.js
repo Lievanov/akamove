@@ -181,7 +181,12 @@ export const getClassesByStudentCount = async (searchTerm, period_name) => {
 
 export const updateAllClassesByClassType = async (data) => {
   try {
-    let { error } = await supabase.from("class").upsert(data);
+    // New levels are built client-side (ClassByType) without a tenant_id;
+    // stamp every row so their inserts pass the tenant RLS check.
+    const tenantId = getActiveTenantId();
+    let { error } = await supabase
+      .from("class")
+      .upsert(data.map((row) => ({ ...row, tenant_id: tenantId })));
     if (error) throw error;
     return true;
   } catch (error) {

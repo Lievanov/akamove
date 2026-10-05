@@ -15,19 +15,19 @@ const ActiveInactiveStudents = () => {
 
   const getChartInfo = async () => {
     const data = await getActiveVsNonActiveStudents();
-    if (data) {
+    if (data?.[0]) {
       const activeStudentsVsNonActiveStudents = {
         active_students: data[0].active_students,
         non_active_students: data[0].total_students - data[0].active_students,
       };
 
       setData(activeStudentsVsNonActiveStudents);
-
-      setLoading(false);
     }
+    // Fall back to zeros rather than an endless skeleton if the query fails.
+    setLoading(false);
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="block" />;
 
   const total = data.active_students + data.non_active_students;
   const activePct = total > 0 ? (data.active_students / total) * 100 : 0;

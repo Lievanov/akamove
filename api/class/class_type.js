@@ -14,14 +14,26 @@ export const getClassTypeList = async () => {
   }
 };
 
+// Class type names are unique per studio, ignoring case and outer
+// spaces (migration 013). Use this to check before creating one.
+export const normalizeClassTypeName = (name) => (name ?? "").trim().toLowerCase();
+
+// Returns { ok, error } — error is user-facing copy.
 export const createClassType = async ({ name }) => {
   try {
-    let { data, error } = await supabase
+    const { error } = await supabase
       .from("class_type")
-      .insert([{ name, tenant_id: getActiveTenantId() }]);
+      .insert([{ name: name.trim(), tenant_id: getActiveTenantId() }]);
     if (error) throw error;
-    return true;
+    return { ok: true, error: null };
   } catch (error) {
     console.error("Error creating class type", error);
+    return {
+      ok: false,
+      error:
+        error?.code === "23505"
+          ? `A class type named “${name.trim()}” already exists.`
+          : "Error saving class type",
+    };
   }
 };

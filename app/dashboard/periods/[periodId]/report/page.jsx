@@ -29,14 +29,14 @@ function PeriodReport() {
   if (loading) return <Loading />;
   return (
     <>
-      <PageHeader title={`Period Report for ${period.name}`} />
+      <PageHeader title={`${period.name} report`} breadcrumbs={[{ label: "Periods", href: "/dashboard/periods" }]} />
       <div className="mx-auto max-w-6xl px-4 py-4 pb-8">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
           <div className="space-y-4 lg:col-span-4">
-            <div className="rounded-lg border border-brand-dark/10 p-4">
+            <div className="rounded-lg border border-brand-dark/10 bg-white p-4">
               <StudentCountByPeriod periodId={periodId} />
             </div>
-            <div className="rounded-lg border border-brand-dark/10 p-4">
+            <div className="rounded-lg border border-brand-dark/10 bg-white p-4">
               <PeriodRevenueSummary
                 periodId={periodId}
                 selectedCategory={selectedCategory}
@@ -44,7 +44,7 @@ function PeriodReport() {
               />
             </div>
           </div>
-          <div className="rounded-lg border border-brand-dark/10 p-4 lg:col-span-8">
+          <div className="rounded-lg border border-brand-dark/10 bg-white p-4 lg:col-span-8">
             {selectedCategory === "classes" && (
               <ClassByPeriodPerStudentCount periodId={periodId} />
             )}

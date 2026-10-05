@@ -1,17 +1,23 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
+import { Pencil, Users, Wallet } from "lucide-react";
 import { getPaymentCountFiltered, getPayments } from "@/api/payment/payment";
-import { useRouter } from "next/navigation";
-import { debounce } from "lodash";
-import { Pencil } from "lucide-react";
+import { getStudentCount } from "@/api/student/students";
 import Loading from "@/app/components/Loading";
-import { formatDate } from "@/app/components/utils/utils";
+import { formatDate, formatMoney } from "@/app/components/utils/utils";
 import { PageHeader } from "@/app/components/ui/PageHeader";
+import { usePageTour } from "@/app/context/OnboardingContext";
+import { TOURS } from "@/app/components/onboarding/tours";
 import { Toast } from "@/app/components/ui/Toast";
-import { Button } from "@/app/components/ui/Button";
-import { IconButton } from "@/app/components/ui/IconButton";
-import { Input } from "@/app/components/ui/Input";
-import { Pagination } from "@/app/components/ui/Pagination";
+import { buttonVariants } from "@/app/components/ui/Button";
+import { iconButtonClass } from "@/app/components/ui/IconButton";
+import { EmptyState } from "@/app/components/ui/EmptyState";
+import { RowMenu } from "@/app/components/ui/RowMenu";
+import {
+  ServerTableCard,
+  rowLinkClass,
+} from "@/app/components/ui/ServerTableCard";
 import {
   Table,
   TableHeader,
@@ -20,156 +26,154 @@ import {
   TableHead,
   TableCell,
 } from "@/app/components/ui/Table";
+import { useServerTable } from "@/app/components/utils/useServerTable";
+import { useFlashAlert } from "@/app/components/utils/useFlashAlert";
+
+const fetchPayments = async ({ from, to, search }) => {
+  const [rows, count] = await Promise.all([
+    getPayments(from, to, search),
+    getPaymentCountFiltered(search),
+  ]);
+  return { rows, count };
+};
 
 function Payments() {
-  const router = useRouter();
-  const ITEMS_PER_PAGE = 10;
-
-  const [payments, setPayments] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [alert, setAlert] = useState({ text: "", severity: "" });
-
-  const debouncedSearch = useRef(
-    debounce(async (value) => {
-      retrievePaymentList(value);
-    }, 500)
-  ).current;
+  const [alert, setAlert] = useFlashAlert();
+  const [studentCount, setStudentCount] = useState(null);
+  const table = useServerTable({ fetchPage: fetchPayments });
+  const hasNoStudents = studentCount === 0;
+  usePageTour(TOURS.payments, {
+    ready: !table.isLoading && studentCount !== null && !hasNoStudents,
+  });
 
   useEffect(() => {
-    const urlSearchParams = new URLSearchParams(window.location.search);
-    const text = urlSearchParams.get("text");
-    const severity = urlSearchParams.get("severity");
-
-    if (text && severity) setAlert({ text, severity });
+    getStudentCount().then((count) => setStudentCount(count ?? -1));
   }, []);
-
-  useEffect(() => {
-    retrievePaymentList(searchTerm);
-  }, [page]);
-
-  useEffect(() => {
-    debouncedSearch(searchTerm);
-  }, [searchTerm]);
-
-  const retrievePaymentList = async (value) => {
-    setPayments([]);
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE - 1;
-    const paymentData = await getPayments(start, end, value ? value : "");
-    setPayments(paymentData);
-    const count = await getPaymentCountFiltered(value ? value : "");
-    setTotalItems(count);
-    setLoading(false);
-  };
-
-  const handleChange = (event) => {
-    const { value } = event.target;
-    setSearchTerm(value);
-    handlePagination(1);
-  };
-
-  const handlePagination = (value) => {
-    setPage(value);
-  };
-
-  if (loading) return <Loading />;
 
   return (
     <>
       <PageHeader title="Payments" />
-      <div className="mx-auto mb-8 max-w-5xl px-4">
+      <div className="mx-auto mb-8 max-w-5xl px-4 pt-6">
         {alert.text && (
           <Toast
             text={alert.text}
             severity={alert.severity}
-            duration={5000}
             onExited={() => setAlert({ text: "", severity: "" })}
           />
         )}
-        <div className="rounded-lg border border-brand-dark/10 p-2 mt-6">
-          <div className="mb-4">
-            <Input
-              id="searchTerm"
-              placeholder="Search by Name, Phone Number or Payment Method"
-              value={searchTerm}
-              onChange={handleChange}
-            />
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>First Name</TableHead>
-                <TableHead>Last Name</TableHead>
-                <TableHead>Payment Date</TableHead>
-                <TableHead>Payment Method</TableHead>
-                <TableHead>Period</TableHead>
-                <TableHead>Payment Amount</TableHead>
-                <TableHead></TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {payments.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>
-                    <button
-                      type="button"
-                      className="font-medium text-brand-pink hover:underline"
-                      onClick={() =>
-                        router.push(`/dashboard/students/${row.student_id}`)
-                      }
-                    >
-                      {row.first_name}
-                    </button>
-                  </TableCell>
-                  <TableCell>{row.last_name}</TableCell>
-                  <TableCell>{formatDate(row.created_at)}</TableCell>
-                  <TableCell>{row.payment_method}</TableCell>
-                  <TableCell>{row.period_name}</TableCell>
-                  <TableCell>
-                    {row.payment_amount
-                      ? `$${row.payment_amount.toFixed(2)}`
-                      : "No payment"}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="secondary"
-                      onClick={() =>
-                        router.push(`/dashboard/payments/${row.student_id}`)
-                      }
-                    >
-                      New Payment
-                    </Button>
-                  </TableCell>
-                  <TableCell>
-                    <IconButton
-                      aria-label="Edit payment"
-                      onClick={() =>
-                        router.push(`/dashboard/payments/edit/${row.id}`)
-                      }
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </IconButton>
-                  </TableCell>
+        {table.isLoading || studentCount === null ? (
+          <Loading variant="table" />
+        ) : hasNoStudents ? (
+          <EmptyState
+            icon={Users}
+            title="No students yet"
+            description="Payments are recorded against students. Add your first student, then you can record their payments here."
+            action={
+              <Link
+                href="/dashboard/students/new"
+                className={buttonVariants()}
+              >
+                Add your first student
+              </Link>
+            }
+          />
+        ) : table.isEmpty ? (
+          <EmptyState
+            icon={Wallet}
+            title="No payments recorded yet"
+            description="To record a payment, open Students and choose “Record payment” next to the student."
+            action={
+              <Link href="/dashboard/students" className={buttonVariants()}>
+                Go to Students
+              </Link>
+            }
+          />
+        ) : (
+          <ServerTableCard
+            table={table}
+            noun={["payment", "payments"]}
+            searchPlaceholder="Search by name, phone number or payment method"
+            noMatchesHint="Try a student's name, phone number, or a method like “cash”."
+            searchTour="payments-search"
+          >
+            <Table data-tour="payments-table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead className="hidden sm:table-cell">Date</TableHead>
+                  <TableHead className="hidden md:table-cell">Method</TableHead>
+                  <TableHead className="hidden md:table-cell">Period</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <div className="mt-4">
-            <Pagination
-              page={page}
-              totalItems={totalItems}
-              pageSize={ITEMS_PER_PAGE}
-              onChange={handlePagination}
-            />
-          </div>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {table.rows.map((row) => {
+                  const fullName = [row.first_name, row.last_name]
+                    .filter(Boolean)
+                    .join(" ");
+                  return (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <Link
+                          href={`/dashboard/students/${row.student_id}`}
+                          className={rowLinkClass}
+                        >
+                          {fullName || "Unnamed student"}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="hidden whitespace-nowrap sm:table-cell">
+                        {formatDate(row.created_at)}
+                      </TableCell>
+                      <TableCell className="hidden capitalize md:table-cell">
+                        {row.payment_method ?? "—"}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">{row.period_name ?? "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right font-medium">
+                        {formatMoney(row.payment_amount)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-1">
+                          <Link
+                            href={`/dashboard/payments/edit/${row.id}`}
+                            aria-label={`Update payment from ${fullName || "student"}`}
+                            className={iconButtonClass}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Link>
+                          <RowMenu
+                            label={`More actions for ${fullName || "student"}`}
+                            items={[
+                              {
+                                label: "Record new payment",
+                                href: `/dashboard/payments/${row.student_id}`,
+                              },
+                              {
+                                label: "View student",
+                                href: `/dashboard/students/${row.student_id}`,
+                              },
+                            ]}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </ServerTableCard>
+        )}
       </div>
     </>
   );
 }
 
-export default Payments;
+export default function PaymentsPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <Payments />
+    </Suspense>
+  );
+}

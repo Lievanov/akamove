@@ -17,7 +17,7 @@ function StudentCountByPeriod({ periodId }) {
     setLoading(false);
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="block" />;
 
   return (
     <div>

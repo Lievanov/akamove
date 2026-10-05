@@ -18,8 +18,10 @@ export function TenantProvider({ children }) {
     } catch {}
   };
 
-  const loadTenants = useCallback(async () => {
-    setTenantsLoading(true);
+  // silent: re-fetch without flipping tenantsLoading, so an in-place
+  // update (e.g. a redeemed trial code) doesn't blank the dashboard.
+  const loadTenants = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setTenantsLoading(true);
     const user = await getUser();
     if (!user?.id) {
       setAvailableTenants([]);

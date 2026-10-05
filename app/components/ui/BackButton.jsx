@@ -15,7 +15,7 @@ function BackButton({ routeTo, className }) {
 
   return (
     <Button variant="outline" onClick={handleBack} className={className}>
-      Return
+      Cancel
     </Button>
   );
 }

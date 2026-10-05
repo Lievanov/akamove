@@ -1,9 +1,9 @@
 import Loading from "../Loading";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getEventPayments } from "@/api/events/event_payment";
-import { useRouter } from "next/navigation";
 import { formatDate } from "../utils/utils";
-import { Button } from "@/app/components/ui/Button";
+import { Button, buttonVariants } from "@/app/components/ui/Button";
 import {
   Table,
   TableHeader,
@@ -12,9 +12,9 @@ import {
   TableHead,
   TableCell,
 } from "@/app/components/ui/Table";
+import { formatMoney } from "@/app/components/utils/utils";
 
 function EventPaymentsList({ eventId, eventName = "" }) {
-  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [payments, setPayments] = useState([]);
@@ -75,18 +75,21 @@ function EventPaymentsList({ eventId, eventName = "" }) {
     URL.revokeObjectURL(url);
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="table" />;
 
   return (
-    <div className="rounded-lg border border-brand-dark/10 p-6">
+    <div className="rounded-lg border border-brand-dark/10 bg-white p-6">
       <h2 className="text-xl font-semibold text-brand-dark">Event Payments</h2>
       <hr className="my-4 border-brand-dark/10" />
       <div className="mb-4 flex justify-between">
-        <Button onClick={() => router.push(`/dashboard/events/${eventId}/payment`)}>
-          Add Payment
-        </Button>
-        <Button variant="secondary" onClick={exportToCsv}>
-          Export
+        <Link
+          href={`/dashboard/events/${eventId}/payment`}
+          className={buttonVariants()}
+        >
+          Record payment
+        </Link>
+        <Button variant="outline" onClick={exportToCsv}>
+          Export CSV
         </Button>
       </div>
       {payments.length === 0 ? (
@@ -94,7 +97,7 @@ function EventPaymentsList({ eventId, eventName = "" }) {
           No payments found for this event.
         </p>
       ) : (
-        <div className="rounded-lg border border-brand-dark/10 p-2">
+        <div className="rounded-lg border border-brand-dark/10 bg-white p-2">
           <Table>
             <TableHeader>
               <TableRow>
@@ -109,7 +112,7 @@ function EventPaymentsList({ eventId, eventName = "" }) {
                   <TableCell>{payment.client_name || "-"}</TableCell>
                   <TableCell>{formatDate(payment.payment_date)}</TableCell>
                   <TableCell>
-                    ${payment.payment_amount ? payment.payment_amount.toFixed(2) : "0.00"}
+                    {formatMoney(payment.payment_amount ?? 0)}
                   </TableCell>
                 </TableRow>
               ))}
@@ -117,7 +120,7 @@ function EventPaymentsList({ eventId, eventName = "" }) {
                 <TableCell></TableCell>
                 <TableCell>Total:</TableCell>
                 <TableCell>
-                  ${payments.reduce((sum, payment) => sum + (payment.payment_amount || 0), 0).toFixed(2)}
+                  {formatMoney(payments.reduce((sum, payment) => sum + (payment.payment_amount || 0), 0))}
                 </TableCell>
               </TableRow>
             </TableBody>

@@ -11,15 +11,18 @@ import {
   TableHead,
   TableCell,
 } from "@/app/components/ui/Table";
+import { formatMoney } from "@/app/components/utils/utils";
 
 function SortableHead({ label, property, orderBy, order, onSort }) {
   const active = orderBy === property;
   return (
-    <TableHead>
+    <TableHead
+      aria-sort={active ? (order === "asc" ? "ascending" : "descending") : "none"}
+    >
       <button
         type="button"
         onClick={() => onSort(property)}
-        className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-brand-dark/60 hover:text-brand-dark"
+        className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-brand-dark/60 hover:text-brand-dark rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-pink"
       >
         {label}
         {active &&
@@ -82,7 +85,7 @@ const ClassByPeriodPerStudentCount = ({ periodId }) => {
   }, [data, order, orderBy]);
 
   if (error) {
-    return <p className="text-sm text-red-600">{error}</p>;
+    return <p className="text-sm text-danger">{error}</p>;
   }
 
   return (
@@ -90,7 +93,7 @@ const ClassByPeriodPerStudentCount = ({ periodId }) => {
       <h3 className="mb-2 text-sm font-semibold text-brand-dark">
         Class By Period Per Student Count
       </h3>
-      <div className="rounded-lg border border-brand-dark/10 p-2">
+      <div className="rounded-lg border border-brand-dark/10 bg-white p-2">
         <Table>
           <TableHeader>
             <TableRow>
@@ -111,7 +114,7 @@ const ClassByPeriodPerStudentCount = ({ periodId }) => {
                   />
                 </TableCell>
                 <TableCell>{item.student_count}</TableCell>
-                <TableCell>$ {item.total_payment.toFixed(2)}</TableCell>
+                <TableCell>{formatMoney(item.total_payment)}</TableCell>
               </TableRow>
             ))}
             <TableRow className="bg-brand-dark/5 font-bold">
@@ -120,7 +123,7 @@ const ClassByPeriodPerStudentCount = ({ periodId }) => {
                 {sortedData.reduce((sum, item) => sum + item.student_count, 0)}
               </TableCell>
               <TableCell>
-                $ {sortedData.reduce((sum, item) => sum + item.total_payment, 0).toFixed(2)}
+                {formatMoney(sortedData.reduce((sum, item) => sum + item.total_payment, 0))}
               </TableCell>
             </TableRow>
           </TableBody>

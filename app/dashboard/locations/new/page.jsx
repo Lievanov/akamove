@@ -14,11 +14,11 @@ function NewLocation() {
     const success = await createLocation(data);
     if (success) {
       router.push(
-        `/dashboard/locations?text=Location+successfully+created!&severity=success`
+        `/dashboard/locations?text=Location+created.&severity=success`
       );
     } else {
       setAlert({
-        text: "Failed to create location, please contact web admin!",
+        text: "Couldn't create the location. Check your connection and try again.",
         severity: "error",
       });
     }
@@ -34,7 +34,7 @@ function NewLocation() {
           onExited={() => setAlert({ text: "", severity: "" })}
         />
       )}
-      <PageHeader title="New Location" />
+      <PageHeader title="New location" breadcrumbs={[{ label: "Locations", href: "/dashboard/locations" }]} />
       <LocationForm onSubmit={onSubmit} />
     </>
   );

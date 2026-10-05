@@ -10,7 +10,7 @@ const InstructorForm = ({ onSubmit, instructor }) => {
     control,
     setValue,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm();
 
   useEffect(() => {
@@ -21,15 +21,12 @@ const InstructorForm = ({ onSubmit, instructor }) => {
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-8">
-      <div className="my-6 rounded-lg border border-brand-dark/10 p-6 md:my-10 md:p-8">
-        <h1 className="text-center text-2xl font-semibold text-brand-dark">
-          {instructor ? "Update" : "New"} Instructor
-        </h1>
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-6">
+      <div className="my-6 rounded-lg border border-brand-dark/10 bg-white p-6 md:my-10 md:p-8">
+        <form onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-4 border-t border-brand-dark/10 pt-6">
             <TextInput
               property="name"
-              label="Instructor Name*"
+              label="Instructor Name"
               errors={errors}
               control={control}
               required="Name is required"
@@ -38,8 +35,8 @@ const InstructorForm = ({ onSubmit, instructor }) => {
           </div>
           <div className="mt-6 flex justify-end gap-2">
             <BackButton routeTo="/dashboard/instructors" />
-            <Button type="submit" autoFocus>
-              {instructor ? "Update" : "Create"} Instructor
+            <Button type="submit" autoFocus disabled={isSubmitting}>
+              {isSubmitting ? "Saving…" : `${instructor ? "Update" : "Create"} Instructor`}
             </Button>
           </div>
         </form>

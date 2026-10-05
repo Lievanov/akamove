@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
+import { rowLinkClass } from "@/app/components/ui/ServerTableCard";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   getClassesByStudent,
@@ -20,6 +22,7 @@ import {
   TableCell,
 } from "@/app/components/ui/Table";
 import { getLatestPeriod, getPeriodById } from "@/api/period/period";
+import { formatMoney } from "@/app/components/utils/utils";
 
 function ClassesByStudentList() {
   const router = useRouter();
@@ -81,12 +84,15 @@ function ClassesByStudentList() {
 
   const retrievePeriodById = async (id) => {
     const period = await getPeriodById(id);
+    if (!period) return;
     currentPeriodIdRef.current = period.id;
     setSearchPeriod(period.name);
   };
 
   const retrieveCurrentPeriod = async () => {
     const period = await getLatestPeriod();
+    // A new studio has no periods yet.
+    if (!period) return;
     currentPeriodIdRef.current = period.id;
     setSearchPeriod(period.name);
   };
@@ -117,23 +123,31 @@ function ClassesByStudentList() {
     setPage(value);
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="table" />;
 
   return (
-    <div className="rounded-lg border border-brand-dark/10 p-2">
-      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-12">
+    <div className="rounded-lg border border-brand-dark/10 bg-white p-2">
+      <div className="mb-2 grid grid-cols-1 gap-3 p-2 md:grid-cols-12">
         <div className="md:col-span-8">
+          <label htmlFor="searchTerm" className="sr-only">
+            Search classes and students
+          </label>
           <Input
             id="searchTerm"
-            placeholder="Search by Class Name, Student Last Name, or Phone Number"
+            type="search"
+            placeholder="Search by class, student last name or phone number"
             value={searchTerm}
             onChange={handleChange}
           />
         </div>
         <div className="md:col-span-4">
+          <label htmlFor="searchPeriod" className="sr-only">
+            Period
+          </label>
           <Input
             id="searchPeriod"
-            placeholder="Search by Period"
+            type="search"
+            placeholder="Period"
             value={searchPeriod}
             onChange={handlePeriodChange}
           />
@@ -143,10 +157,9 @@ function ClassesByStudentList() {
         <TableHeader>
           <TableRow>
             <TableHead>Class</TableHead>
-            <TableHead>Student First Name</TableHead>
-            <TableHead>Student Last Name</TableHead>
-            <TableHead>Amount Paid</TableHead>
-            <TableHead>Period</TableHead>
+            <TableHead>Student</TableHead>
+            <TableHead className="hidden text-right sm:table-cell">Amount paid</TableHead>
+            <TableHead className="hidden md:table-cell">Period</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -162,25 +175,28 @@ function ClassesByStudentList() {
                 />
               </TableCell>
               <TableCell>
-                <button
-                  type="button"
-                  className="font-medium text-brand-pink hover:underline"
-                  onClick={() => router.push(`/dashboard/students/${row.id}`)}
+                <Link
+                  href={`/dashboard/students/${row.id}`}
+                  className={rowLinkClass}
                 >
-                  {row.first_name}
-                </button>
+                  {[row.first_name, row.last_name].filter(Boolean).join(" ")}
+                </Link>
               </TableCell>
-              <TableCell>{row.last_name}</TableCell>
-              <TableCell>
-                {paymentAmounts[`${row.id}_${row.class_id}`] != null
-                  ? `$${paymentAmounts[`${row.id}_${row.class_id}`].toFixed(2)}`
-                  : "—"}
+              <TableCell className="hidden text-right sm:table-cell">
+                {formatMoney(paymentAmounts[`${row.id}_${row.class_id}`])}
               </TableCell>
-              <TableCell>{row.period_name}</TableCell>
+              <TableCell className="hidden md:table-cell">{row.period_name}</TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+      {classes?.length === 0 && (
+        <p className="py-8 text-center text-sm text-brand-dark/60">
+          {searchTerm
+            ? "No students match your search."
+            : "No students are enrolled in classes for this period yet. They show up here once they pay for classes."}
+        </p>
+      )}
       <div className="mt-4">
         <Pagination
           page={page}

@@ -10,9 +10,9 @@ const ICONS = {
 };
 
 const STYLES = {
-  success: "bg-green-50 text-green-800 border-green-200",
-  error: "bg-red-50 text-red-800 border-red-200",
-  warning: "bg-amber-50 text-amber-800 border-amber-200",
+  success: "bg-success-soft text-success border-success/20",
+  error: "bg-danger-soft text-danger border-danger/20",
+  warning: "bg-warning-soft text-warning border-warning/25",
   info: "bg-brand-pink/10 text-brand-dark border-brand-pink/20",
 };
 

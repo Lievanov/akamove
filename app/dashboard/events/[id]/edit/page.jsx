@@ -7,9 +7,6 @@ import EventForm from "@/app/components/form/EventForm";
 import Loading from "@/app/components/Loading";
 import { Toast } from "@/app/components/ui/Toast";
 import { PageHeader } from "@/app/components/ui/PageHeader";
-import { getUserRoleForTenant } from "@/api/tenant/tenant";
-import { getUser } from "@/lib/supabase/client";
-import { useActiveTenant } from "@/app/context/TenantContext";
 
 function EditEvent() {
   const router = useRouter();
@@ -17,40 +14,10 @@ function EditEvent() {
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState({ text: "", severity: "" });
   const [event, setEvent] = useState({});
-  const [checkingAccess, setCheckingAccess] = useState(true);
-  const { activeTenant, tenantsLoading } = useActiveTenant();
 
   useEffect(() => {
-    let isActive = true;
-    const checkAccess = async () => {
-      const user = await getUser();
-      if (!user?.id) {
-        router.replace("/");
-        return;
-      }
-
-      if (tenantsLoading) return;
-
-      const role = await getUserRoleForTenant(user.id, activeTenant?.id);
-      if (!["admin", "staff"].includes(role)) {
-        router.replace("/dashboard/access-denined");
-        return;
-      }
-
-      if (isActive) setCheckingAccess(false);
-    };
-
-    checkAccess();
-
-    return () => {
-      isActive = false;
-    };
-  }, [router, activeTenant?.id, tenantsLoading]);
-
-  useEffect(() => {
-    if (checkingAccess) return;
     getEvent();
-  }, [checkingAccess]);
+  }, []);
 
   const getEvent = async () => {
     setEvent(await getEventById(id));
@@ -62,17 +29,17 @@ function EditEvent() {
 
     if (result !== false) {
       router.push(
-        `/dashboard/events?text=Event+successfully+updated!&severity=success`
+        `/dashboard/events?text=Event+updated.&severity=success`
       );
     } else {
       setAlert({
-        text: "Failed to update event, please contact web admin!",
+        text: "Couldn't update the event. Check your connection and try again.",
         severity: "error",
       });
     }
   };
 
-  if (checkingAccess || loading) return <Loading />;
+  if (loading) return <Loading variant="form-page" />;
 
   return (
     <>
@@ -84,7 +51,7 @@ function EditEvent() {
           onExited={() => setAlert({ text: "", severity: "" })}
         />
       )}
-      <PageHeader title="Edit Event" />
+      <PageHeader title="Update event" breadcrumbs={[{ label: "Events", href: "/dashboard/events" }]} />
       <EventForm onSubmit={onSubmit} data={event} />
     </>
   );

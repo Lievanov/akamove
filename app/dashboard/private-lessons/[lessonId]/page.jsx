@@ -18,6 +18,7 @@ import {
   TableHead,
   TableCell,
 } from "@/app/components/ui/Table";
+import { formatDate } from "@/app/components/utils/utils";
 
 function UpdatePrivateLesson() {
   const router = useRouter();
@@ -44,17 +45,17 @@ function UpdatePrivateLesson() {
     const success = await updatePrivateLesson({ id: lessonId, ...data });
     if (success) {
       router.push(
-        `/dashboard/private-lessons?text=Private+lesson+successfully+updated!&severity=success`
+        `/dashboard/private-lessons?text=Private+lesson+updated.&severity=success`
       );
     } else {
       setAlert({
-        text: "Failed to update private lesson, please contact web admin!",
+        text: "Couldn't update the private lesson. Check your connection and try again.",
         severity: "error",
       });
     }
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="form-page" />;
 
   return (
     <>
@@ -66,14 +67,14 @@ function UpdatePrivateLesson() {
           onExited={() => setAlert({ text: "", severity: "" })}
         />
       )}
-      <PageHeader title="Update Private Lesson" />
+      <PageHeader title="Update private lesson" breadcrumbs={[{ label: "Private Lessons", href: "/dashboard/private-lessons" }]} />
       <PrivateLessonForm onSubmit={onSubmit} lesson={lesson} />
 
       <div className="mx-auto max-w-2xl px-4 pb-8">
         <h2 className="mb-2 text-lg font-semibold text-brand-dark">
           Class History
         </h2>
-        <div className="rounded-lg border border-brand-dark/10 p-2">
+        <div className="rounded-lg border border-brand-dark/10 bg-white p-2">
           <Table>
             <TableHeader>
               <TableRow>
@@ -96,7 +97,7 @@ function UpdatePrivateLesson() {
                   const dt = new Date(log.used_at);
                   return (
                     <TableRow key={log.id}>
-                      <TableCell>{dt.toLocaleDateString()}</TableCell>
+                      <TableCell>{formatDate(dt)}</TableCell>
                       <TableCell>
                         {dt.toLocaleTimeString([], {
                           hour: "2-digit",

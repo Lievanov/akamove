@@ -1,10 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import Loading from "@/app/components/Loading";
 import { PageHeader } from "@/app/components/ui/PageHeader";
-import { Button } from "@/app/components/ui/Button";
 import { Select } from "@/app/components/ui/Select";
 import { Chip } from "@/app/components/ui/Chip";
 import {
@@ -18,9 +16,7 @@ import {
 import { getPrivateLessonLogsReport } from "@/api/private_lesson/private_lesson";
 import { getStudioFee } from "@/api/settings/settings";
 import { getAllInstructors } from "@/api/instructor/instructor";
-import { getUser } from "@/lib/supabase/client";
-import { getUserRoleForTenant } from "@/api/tenant/tenant";
-import { useActiveTenant } from "@/app/context/TenantContext";
+import { formatDate, formatMoney } from "@/app/components/utils/utils";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -33,10 +29,8 @@ function buildYears() {
 }
 
 export default function PrivateLessonReports() {
-  const router = useRouter();
   const now = new Date();
 
-  const [accessChecked, setAccessChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [instructors, setInstructors] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -45,30 +39,15 @@ export default function PrivateLessonReports() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [instructorId, setInstructorId] = useState("all");
-  const { activeTenant, tenantsLoading } = useActiveTenant();
 
   useEffect(() => {
-    const checkAccess = async () => {
-      const user = await getUser();
-      if (!user?.id) { router.push("/dashboard/access-denined"); return; }
-      if (tenantsLoading) return;
-      const role = await getUserRoleForTenant(user.id, activeTenant?.id);
-      if (role !== "admin") { router.push("/dashboard/access-denined"); return; }
-      setAccessChecked(true);
-    };
-    checkAccess();
-  }, [router, activeTenant?.id, tenantsLoading]);
-
-  useEffect(() => {
-    if (!accessChecked) return;
     getAllInstructors().then((data) => setInstructors(data || []));
     getStudioFee().then((fee) => setStudioFee(fee || 0));
-  }, [accessChecked]);
+  }, []);
 
   useEffect(() => {
-    if (!accessChecked) return;
     fetchReport();
-  }, [month, year, instructorId, accessChecked]);
+  }, [month, year, instructorId]);
 
   const fetchReport = async () => {
     setLoading(true);
@@ -103,24 +82,15 @@ export default function PrivateLessonReports() {
   const grandTotalFees = summaryRows.reduce((sum, r) => sum + r.totalFees, 0);
   const grandTotalPay = summaryRows.reduce((sum, r) => sum + r.totalPay, 0);
 
-  if (!accessChecked || loading) return <Loading />;
+  if (loading) return <Loading />;
 
   return (
     <>
-      <PageHeader title="Private Lesson Reports" />
+      <PageHeader title="Private lesson reports" breadcrumbs={[{ label: "Private Lessons", href: "/dashboard/private-lessons" }]} />
       <div className="mx-auto mb-8 max-w-5xl px-4">
         <div className="my-6">
-          <Button
-            variant="ghost"
-            className="mb-4"
-            onClick={() => router.push("/dashboard/private-lessons")}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Private Lessons
-          </Button>
-
           {/* Filters */}
-          <div className="mb-6 flex flex-wrap gap-4 rounded-lg border border-brand-dark/10 p-4">
+          <div className="mb-6 flex flex-wrap gap-4 rounded-lg border border-brand-dark/10 bg-white p-4">
             <div className="w-40">
               <Select
                 label="Month"
@@ -154,7 +124,7 @@ export default function PrivateLessonReports() {
           <h2 className="mb-2 text-lg font-semibold text-brand-dark">
             Summary — {MONTHS[month - 1]} {year}
           </h2>
-          <div className="mb-6 rounded-lg border border-brand-dark/10">
+          <div className="mb-6 rounded-lg border border-brand-dark/10 bg-white">
             {summaryRows.length === 0 ? (
               <p className="p-4 text-sm text-brand-dark/60">
                 No classes recorded for this period.
@@ -175,19 +145,19 @@ export default function PrivateLessonReports() {
                     <TableRow key={row.name}>
                       <TableCell>{row.name}</TableCell>
                       <TableCell>
-                        <Chip label={row.count} className="bg-brand-pink" />
+                        <Chip label={row.count} tone="accent" />
                       </TableCell>
-                      <TableCell>${row.totalGross.toFixed(2)}</TableCell>
-                      <TableCell>-${row.totalFees.toFixed(2)}</TableCell>
-                      <TableCell>${row.totalPay.toFixed(2)}</TableCell>
+                      <TableCell>{formatMoney(row.totalGross)}</TableCell>
+                      <TableCell>{formatMoney(-row.totalFees)}</TableCell>
+                      <TableCell>{formatMoney(row.totalPay)}</TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="font-bold">
                     <TableCell>Total</TableCell>
                     <TableCell>{logs.length}</TableCell>
-                    <TableCell>${grandTotalGross.toFixed(2)}</TableCell>
-                    <TableCell>-${grandTotalFees.toFixed(2)}</TableCell>
-                    <TableCell>${grandTotalPay.toFixed(2)}</TableCell>
+                    <TableCell>{formatMoney(grandTotalGross)}</TableCell>
+                    <TableCell>{formatMoney(-grandTotalFees)}</TableCell>
+                    <TableCell>{formatMoney(grandTotalPay)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -198,7 +168,7 @@ export default function PrivateLessonReports() {
 
           {/* Detail log */}
           <h2 className="mb-2 text-lg font-semibold text-brand-dark">Class Log</h2>
-          <div className="rounded-lg border border-brand-dark/10">
+          <div className="rounded-lg border border-brand-dark/10 bg-white">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -237,14 +207,14 @@ export default function PrivateLessonReports() {
                             : "—"}
                         </TableCell>
                         <TableCell>{log.instructor?.name ?? "—"}</TableCell>
-                        <TableCell>{dt.toLocaleDateString()}</TableCell>
+                        <TableCell>{formatDate(dt)}</TableCell>
                         <TableCell>
                           {dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </TableCell>
-                        <TableCell>${amount.toFixed(2)}</TableCell>
-                        <TableCell>${costPerClass.toFixed(2)}</TableCell>
-                        <TableCell>-${studioFee.toFixed(2)}</TableCell>
-                        <TableCell>${netPay.toFixed(2)}</TableCell>
+                        <TableCell>{formatMoney(amount)}</TableCell>
+                        <TableCell>{formatMoney(costPerClass)}</TableCell>
+                        <TableCell>{formatMoney(-studioFee)}</TableCell>
+                        <TableCell>{formatMoney(netPay)}</TableCell>
                       </TableRow>
                     );
                   })

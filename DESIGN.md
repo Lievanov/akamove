@@ -5,6 +5,14 @@ colors:
   brand-pink: "#E8195E"
   brand-dark: "#1B0E1E"
   brand-cream: "#F7E7E2"
+  brand-pink-deep: "#D71656"
+  brand-pink-deeper: "#C21350"
+  success: "#1F7A4D"
+  success-soft: "#E6F3EB"
+  warning: "#8F5300"
+  warning-soft: "#FCF0DC"
+  danger: "#B42318"
+  danger-soft: "#FCEBE8"
 typography:
   display:
     fontFamily: "Fraunces, Georgia, serif"
@@ -30,7 +38,7 @@ spacing:
   section: "112px"
 components:
   button-primary:
-    backgroundColor: "{colors.brand-pink}"
+    backgroundColor: "{colors.brand-pink-deep}"
     textColor: "#ffffff"
     rounded: "{rounded.sm}"
     padding: "10px 16px"
@@ -73,9 +81,21 @@ Three brand colors, sourced from the aka Move logo (public/images/am_logo.png), 
 - **Aubergine Dark** (`#1B0E1E`): primary text color everywhere, dashboard and public site alike. Never a full-bleed section background on the public site; it appears as text, icon strokes, the secondary button fill, and the fixed capsule-pill nav's own background (a deliberately dark UI-chrome element that reads consistently over every light section behind it).
 - **Rose Cream** (`#F7E7E2`): a paper/light neutral field on Persuade surfaces (The Floor, Pricing) and reversed text color on pink fields.
 - White (`#ffffff`): the base ground for both registers — dashboard component surfaces (inputs, selects, dialogs, cards), and on the public site the Hero and The Office sections, plus card fills in Pricing.
+- Dashboard canvas (`brand-cream/30`): the faintly warm page ground behind the dashboard's white cards and tables.
+
+### Status (dashboard feedback only)
+Three functional colors, tuned warm and slightly desaturated so they sit beside the brand palette. Each has an ink (`DEFAULT`, ≥4.5:1 on white and on its own soft fill) and a `soft` fill.
+- **Success** (`#1F7A4D` / soft `#E6F3EB`): saved, paid, active, accepted.
+- **Warning** (`#8F5300` / soft `#FCF0DC`): pending, unsaved changes, needs attention.
+- **Danger** (`#B42318` / soft `#FCEBE8`): errors, failed actions, destructive controls. A deep brick red, deliberately darker than Signal Pink so an error never reads as the brand accent (and the accent never reads as an error).
+
+### Categorical (data only)
+Eight soft-fill + dark-ink pairs (`category.rose`, `indigo`, `teal`, `ochre`, `plum`, `olive`, `clay`, `slate` in `tailwind.config.js`) for telling class types apart in `ClassChips`. Each class type gets a stable color hashed from its id. All pairs are AA-contrast; they never appear outside data labels.
 
 ### Named Rules
-**The Brand-Only Rule.** Every surface in the app — dashboard or public site — draws its color exclusively from brand-pink, brand-dark, and brand-cream (plus opacity variants of those three, and plain white/black as neutrals). No other hue is introduced anywhere.
+**The Brand-Only Rule.** Every surface in the app — dashboard or public site — draws its decorative and identity color exclusively from brand-pink, brand-dark, and brand-cream (plus opacity variants of those three, and plain white/black as neutrals). The only other hues allowed are the status tokens (success / warning / danger) for state feedback and the categorical tokens for data labels — never as decoration, backgrounds, or emphasis. Raw Tailwind palette colors (`red-600`, `green-600`, …) are never used.
+
+**The Deep-Pink-for-Text Rule.** Signal Pink (`#E8195E`) gives only 4.44:1 with white, just under WCAG AA for small text. So anywhere pink sits behind a label (primary buttons, the active nav item, accent chips, the selected date) or *is* small text (links, required marks, inline highlights), use **`brand-pink-deep`** (`#D71656`, 5.1:1), with `brand-pink-deeper` (`#C21350`) for hover. Plain Signal Pink stays for fills with no text on them (progress bars, legend dots), focus rings, icons, and the public site's large-type pink sections.
 
 **The Light-Theme-for-Persuade Rule.** The public site's ground is always light — white or brand-cream, never brand-dark — with brand-pink used as full-bleed punctuation on roughly half the sections for vibrancy. Brand-dark supplies text and small UI chrome (buttons, nav, icon strokes) on the public site exactly as it does on the dashboard; it is never a page-filling field there.
 
@@ -126,7 +146,7 @@ Flat by default across both registers. Dashboard components use only `shadow-sm`
 
 ### Buttons
 - **Shape:** `rounded-md` (6px), consistent across both registers.
-- **Primary:** `bg-brand-pink` / white text.
+- **Primary:** `bg-brand-pink-deep` / white text, hover `bg-brand-pink-deeper` (see the Deep-Pink-for-Text Rule).
 - **Secondary:** `bg-brand-dark` / cream text.
 - **Outline:** transparent, `border-brand-dark/20`, `text-brand-dark`.
 - **Ghost:** transparent, `text-brand-dark`, hover `bg-brand-dark/5`.

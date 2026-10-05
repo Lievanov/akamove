@@ -14,11 +14,11 @@ function NewInstructor() {
     const success = await createInstructor(data);
     if (success) {
       router.push(
-        `/dashboard/instructors?text=Instructor+successfully+created!&severity=success`
+        `/dashboard/instructors?text=Instructor+created.&severity=success`
       );
     } else {
       setAlert({
-        text: "Failed to create instructor, please contact web admin!",
+        text: "Couldn't create the instructor. Check your connection and try again.",
         severity: "error",
       });
     }
@@ -34,7 +34,7 @@ function NewInstructor() {
           onExited={() => setAlert({ text: "", severity: "" })}
         />
       )}
-      <PageHeader title="New Instructor" />
+      <PageHeader title="New instructor" breadcrumbs={[{ label: "Instructors", href: "/dashboard/instructors" }]} />
       <InstructorForm onSubmit={onSubmit} />
     </>
   );

@@ -3,8 +3,17 @@ import * as RadixSelect from "@radix-ui/react-select";
 import { Controller } from "react-hook-form";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "./utils/cn";
+import { useFieldIds, fieldAria, FieldLabel, FieldError } from "./Field";
 
-function SelectCore({ value, onChange, options = [], disabled, error, placeholder = "Select..." }) {
+function SelectCore({
+  value,
+  onChange,
+  options = [],
+  disabled,
+  error,
+  placeholder = "Select...",
+  ...triggerProps
+}) {
   return (
     <RadixSelect.Root
       value={value != null ? String(value) : undefined}
@@ -12,9 +21,10 @@ function SelectCore({ value, onChange, options = [], disabled, error, placeholde
       disabled={disabled}
     >
       <RadixSelect.Trigger
+        {...triggerProps}
         className={cn(
-          "flex w-full items-center justify-between rounded-md border bg-white px-3 py-2 text-sm text-brand-dark shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-pink disabled:cursor-not-allowed disabled:bg-brand-dark/5",
-          error ? "border-red-500" : "border-brand-dark/20"
+          "flex w-full items-center justify-between rounded-md border bg-white px-3 py-2 text-base sm:text-sm touch:min-h-11 text-brand-dark shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-pink disabled:cursor-not-allowed disabled:bg-brand-dark/5",
+          error ? "border-danger" : "border-brand-dark/20"
         )}
       >
         <RadixSelect.Value placeholder={placeholder} />
@@ -29,7 +39,7 @@ function SelectCore({ value, onChange, options = [], disabled, error, placeholde
               <RadixSelect.Item
                 key={option.value}
                 value={String(option.value)}
-                className="relative flex cursor-pointer select-none items-center rounded px-8 py-2 text-sm text-brand-dark outline-none data-[highlighted]:bg-brand-pink/10"
+                className="relative flex cursor-pointer select-none items-center rounded px-8 py-2 text-sm touch:py-3 text-brand-dark outline-none data-[highlighted]:bg-brand-pink/10"
               >
                 <RadixSelect.ItemIndicator className="absolute left-2 inline-flex items-center">
                   <Check className="h-4 w-4" />
@@ -55,18 +65,19 @@ function Select({
   placeholder = "Select...",
   value,
   onChange,
+  "aria-label": ariaLabel,
 }) {
   const hasError = !!errors?.[property];
+  const { id, errorId } = useFieldIds();
+  const a11y = {
+    ...fieldAria({ id, errorId, hasError, required: !!required }),
+    "aria-label": label ? undefined : ariaLabel,
+  };
 
-  const labelEl = label && (
-    <label
-      className={cn(
-        "mb-1 block text-sm font-medium",
-        hasError ? "text-red-600" : "text-brand-dark"
-      )}
-    >
+  const labelEl = (
+    <FieldLabel htmlFor={id} hasError={hasError} required={!!required}>
       {label}
-    </label>
+    </FieldLabel>
   );
 
   if (!control) {
@@ -74,6 +85,7 @@ function Select({
       <div className="w-full">
         {labelEl}
         <SelectCore
+          {...a11y}
           value={value}
           onChange={onChange}
           options={options}
@@ -93,6 +105,7 @@ function Select({
         rules={{ ...(required && { required }) }}
         render={({ field }) => (
           <SelectCore
+            {...a11y}
             value={field.value}
             onChange={field.onChange}
             options={options}
@@ -102,9 +115,7 @@ function Select({
           />
         )}
       />
-      {hasError && (
-        <p className="mt-1 text-sm text-red-600">{errors[property].message}</p>
-      )}
+      <FieldError id={errorId} error={errors?.[property]} />
     </div>
   );
 }

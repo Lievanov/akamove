@@ -26,17 +26,17 @@ function UpdateInstructor() {
     const success = await updateInstructor({ id: instructorId, ...data });
     if (success) {
       router.push(
-        `/dashboard/instructors?text=Instructor+successfully+updated!&severity=success`
+        `/dashboard/instructors?text=Instructor+updated.&severity=success`
       );
     } else {
       setAlert({
-        text: "Failed to update instructor, please contact web admin!",
+        text: "Couldn't update the instructor. Check your connection and try again.",
         severity: "error",
       });
     }
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="form-page" />;
 
   return (
     <>
@@ -48,7 +48,7 @@ function UpdateInstructor() {
           onExited={() => setAlert({ text: "", severity: "" })}
         />
       )}
-      <PageHeader title="Update Instructor" />
+      <PageHeader title="Update instructor" breadcrumbs={[{ label: "Instructors", href: "/dashboard/instructors" }]} />
       <InstructorForm onSubmit={onSubmit} instructor={instructor} />
     </>
   );

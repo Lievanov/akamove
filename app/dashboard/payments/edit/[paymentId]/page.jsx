@@ -43,11 +43,11 @@ function EditPayment() {
       data.id = paymentId;
       if (await editPayment(data)) {
         router.push(
-          `/dashboard/payments?text=Payment+updated+successfully&severity=success`
+          `/dashboard/payments?text=Payment+updated.&severity=success`
         );
       } else {
         setAlert({
-          text: "Failed to update the student, please contact web admin!",
+          text: "Couldn't update the payment. Check your connection and try again.",
           severity: "error",
         });
       }
@@ -56,7 +56,7 @@ function EditPayment() {
     }
   };
 
-  if (loading) return <Loading />;
+  if (loading) return <Loading variant="form-page" />;
 
   return (
     <>
@@ -69,7 +69,8 @@ function EditPayment() {
         />
       )}
       <PageHeader
-        title={`Edit Payment for ${payment.student.first_name} ${payment.student.last_name}`}
+        title={`Update payment: ${payment.student.first_name} ${payment.student.last_name}`}
+        breadcrumbs={[{ label: "Payments", href: "/dashboard/payments" }]}
       />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="lg:col-span-7">

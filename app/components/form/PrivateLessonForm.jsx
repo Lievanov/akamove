@@ -22,7 +22,7 @@ const PrivateLessonForm = ({
     setValue,
     watch,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm();
 
   const watchedAmount = watch("amount");
@@ -98,14 +98,12 @@ const PrivateLessonForm = ({
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-8">
-      <div className="my-6 rounded-lg border border-brand-dark/10 p-6 md:my-10 md:p-8">
-        <h1 className="text-center text-2xl font-semibold text-brand-dark">
-          {lesson ? "Update" : "New"} Private Lesson
-        </h1>
-        <form onSubmit={handleSubmit(preSubmit)} className="mt-6">
+      <div className="my-6 rounded-lg border border-brand-dark/10 bg-white p-6 md:my-10 md:p-8">
+        <form onSubmit={handleSubmit(preSubmit)}>
           <div className="space-y-4 border-t border-brand-dark/10 pt-6">
             <Combobox
-              label="Student*"
+              label="Student"
+              required
               value={selectedStudent}
               onChange={setSelectedStudent}
               onSearchChange={searchStudents}
@@ -115,7 +113,8 @@ const PrivateLessonForm = ({
               searchPlaceholder="Search by name"
             />
             <Combobox
-              label="Instructor*"
+              label="Instructor"
+              required
               value={selectedInstructor}
               onChange={setSelectedInstructor}
               options={instructors}
@@ -123,7 +122,7 @@ const PrivateLessonForm = ({
             />
             <TextInput
               property="lessons_purchased"
-              label="Lessons Purchased*"
+              label="Lessons Purchased"
               errors={errors}
               control={control}
               required="Lessons purchased is required"
@@ -137,7 +136,7 @@ const PrivateLessonForm = ({
             />
             <TextInput
               property="amount"
-              label="Amount*"
+              label="Amount"
               errors={errors}
               control={control}
               required="Amount is required"
@@ -153,8 +152,8 @@ const PrivateLessonForm = ({
           </div>
           <div className="mt-6 flex justify-end gap-2">
             <BackButton routeTo={backRouteTo} />
-            <Button type="submit" autoFocus>
-              {lesson ? "Update" : "Create"} Private Lesson
+            <Button type="submit" autoFocus disabled={isSubmitting}>
+              {isSubmitting ? "Saving…" : `${lesson ? "Update" : "Create"} Private Lesson`}
             </Button>
           </div>
         </form>
