@@ -24,6 +24,7 @@ const TRIAL_ERROR_MESSAGES = {
   no_trial: "This studio isn't on a trial.",
   not_a_downgrade: "That plan isn't lower than your current one. Upgrades open once online billing is live.",
   invalid_plan: "That plan doesn't exist.",
+  has_subscription: "Your plan is billed through Stripe, so changes apply at the end of your billing period. Use the plan cards to switch.",
   not_tenant_admin: "Only studio admins can change the plan.",
 };
 
@@ -36,7 +37,7 @@ export const getUserTenants = async (userId) => {
     const { data, error } = await supabase
       .from("user_tenant")
       .select(
-        "role, tenant:tenant_id(id, name, plan, trial_status, trial_ends_at, trial_code)"
+        "role, tenant:tenant_id(id, name, plan, trial_status, trial_ends_at, trial_code, billing_exempt)"
       )
       .eq("user_id", userId);
     if (error) throw error;
@@ -46,6 +47,7 @@ export const getUserTenants = async (userId) => {
         id: row.tenant.id,
         name: row.tenant.name,
         ...withEffectiveTrial(row.tenant),
+        billingExempt: !!row.tenant.billing_exempt,
         role: row.role,
       }));
   } catch (error) {

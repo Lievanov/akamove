@@ -88,6 +88,12 @@ The setup checklist's "dismissed" flag needs no migration — it's the `onboardi
 
 14. `014_downgrade_tenant_plan.sql` — `plan_rank(plan)` and the admin-only `downgrade_tenant_plan(tenant_id, plan)` RPC behind Settings → Membership. Only moves to a lower plan (upgrades raise `not_a_downgrade` until billing exists); downgrading during an active trial ends the trial so `expire_due_trials()` can't later overwrite the chosen plan. Also removes `plan` from `authenticated`'s UPDATE grant on `tenant` (now `name, slug, updated_at`), so plan changes only go through the RPC. Deploy with the Membership tab (`app/dashboard/settings/membership/`, `api/tenant/tenant.js`) — until it runs, the tab's "Switch" buttons return an error.
 
+## Phase 10 — Stripe billing
+
+15. `015_billing.sql` — billing data model: `tenant.billing_exempt` (set on `default-studio`), `tenant_billing` (mirror of the Stripe customer + subscription; admins can select, only the service role writes), `stripe_event` (webhook idempotency) and `cancellation_feedback` (post-cancel survey), both service-role only. Adds `apply_stripe_subscription(...)`, the service-role-only function the webhook uses to set `tenant.plan`, and makes `downgrade_tenant_plan` raise `has_subscription` for studios billed through Stripe. **Data change:** moves every non-exempt studio on Studio / Pro Studio with no live subscription and no active trial to Starter; their staff lose dashboard access right away (no notification is sent yet). Before running, set `billing_exempt = true` on any other studio that must keep its plan.
+16. `016_billing_verification.sql` — read-only checks for 015.
+17. `017_signup_starts_on_starter.sql` — `create_tenant_and_admin` no longer grants a paid plan: without a trial, every new studio starts on Starter and onboarding sends the admin to Stripe Checkout for the plan they picked. Closes the hole where calling the RPC with `p_plan = 'studio'` gave a paid plan for free. Deploy with the Phase 4 onboarding change.
+
 ## After running any migration
 
 - Run its paired verification file, if one exists, and confirm every
@@ -104,3 +110,20 @@ The setup checklist's "dismissed" flag needs no migration — it's the `onboardi
   above, blocked on the two unreviewed credit RPCs.
 - `deletion_requests` — excluded from `tenant_id` entirely; it has no
   RLS policies (service-role access only) and isn't studio data.
+
+### Testing billing (Phase 10)
+
+**Automated — `npm run billing:scenarios`.** Runs the real `lib/billing` code against your Stripe sandbox on test clocks (renewals and trial ends in seconds), with the database faked so Supabase is never touched. Covers: subscribe, upgrade (charged amount = preview), monthly → yearly, declined card and 3D Secure on upgrade, scheduled downgrade → applied at period end → upgrade again, undo a downgrade, cancel → resume → cancel → Starter, failed renewal → past_due → cancel voids the invoice, and trial → first charge on the trial date. Needs a sandbox key and Stripe Tax settings (head office address) in that sandbox; refuses live keys. Pass a word to run a subset: `npm run billing:scenarios -- downgrade`.
+
+**By hand — webhook delivery, Checkout and the Portal** (not reachable from a script). With migrations 015–017 run, `npm run dev`, and the [Stripe CLI](https://docs.stripe.com/stripe-cli) running `stripe listen --forward-to localhost:3000/api/billing/webhook` (its `whsec_…` in `STRIPE_WEBHOOK_SECRET`):
+
+- [ ] Onboarding → pick Studio (no trial) → Stripe Checkout with `4242 4242 4242 4242` → back on Membership, "Confirming your payment…" → Studio, card shown.
+- [ ] Same with `4000 0025 0000 3155` (3D Secure) — complete and fail the challenge.
+- [ ] Back out of Checkout → "Checkout cancelled — nothing was charged", studio stays on Starter.
+- [ ] Trial studio → "Keep Pro Studio after the trial" → Checkout shows $0 today; Membership shows the trial end date as the first charge.
+- [ ] Upgrade dialog shows the amount and tax; after paying, the plan changes.
+- [ ] Switch to a lower plan → "Switches to … on {date}" → "Keep …" undoes it.
+- [ ] Cancel → survey (answer once, skip once) → "Cancels on {date}" → Resume.
+- [ ] Update card → Portal opens on the card screen; back in the app the new last 4 digits show.
+- [ ] Invoices & billing details → Portal has no cancel or plan-change options.
+- [ ] `stripe trigger invoice.payment_failed` style checks: in the Stripe Dashboard, `stripe_event` rows get `processed_at`; resending an event from the Dashboard is skipped as a duplicate.

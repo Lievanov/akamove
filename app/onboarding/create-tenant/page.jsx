@@ -12,6 +12,9 @@ import {
 } from "@/api/tenant/tenant";
 import { saveTimezone, guessTimezone, TIMEZONE_OPTIONS } from "@/api/settings/settings";
 import { createLocation } from "@/api/location/location";
+import { startCheckout } from "@/api/billing/billing";
+import { PLANS } from "@/app/components/membership/plans";
+import IntervalToggle from "@/app/components/membership/IntervalToggle";
 import { pricingTiers } from "@/app/components/landing/sectionsData";
 import LoadingScreen from "@/app/components/LoadingScreen";
 import { Toast } from "@/app/components/ui/Toast";
@@ -28,20 +31,10 @@ import {
 import { cn } from "@/app/components/ui/utils/cn";
 
 // Self-serve signup only offers the three plans a studio can pick
-// itself — "Serious Business" is a sales-contact tier, not something
-// create_tenant_and_admin accepts. Reusing the marketing page's own
-// pricingTiers keeps the price/cap/feature copy from drifting out of
-// sync between the two screens.
-const SIGNUP_PLANS = pricingTiers
-  .filter((tier) => tier.name !== "Serious Business")
-  .map((tier) => ({
-    value: tier.name.toLowerCase(),
-    name: tier.name,
-    priceLabel: tier.price ?? `$${tier.monthlyPrice}`,
-    cadence: tier.price ? tier.cadence : "/month",
-    cap: tier.cap,
-    features: tier.features,
-  }));
+// itself — "Serious Business" is a sales-contact tier. PLANS is built from
+// the marketing page's pricingTiers and the billing catalog, so prices
+// and copy match the public site and Stripe.
+const SIGNUP_PLANS = PLANS;
 
 // Keep in sync with v_trial_days in create_tenant_and_admin (migration 011).
 const TRIAL_DAYS = 14;
@@ -63,6 +56,7 @@ function CreateTenant() {
   const [staffDialogOpen, setStaffDialogOpen] = useState(false);
   const [trialUsed, setTrialUsed] = useState(false);
   const [showCodeInput, setShowCodeInput] = useState(false);
+  const [interval, setBillingInterval] = useState("month");
 
   const {
     control,
@@ -83,6 +77,9 @@ function CreateTenant() {
   // One trial per user — someone who already had one goes straight to
   // the plan picker.
   const startingTrial = !trialUsed && !watch("pickPlan");
+  // A paid plan without the trial is paid for on the next screen (Stripe
+  // Checkout); the studio starts on Starter until that payment lands.
+  const payingNow = !startingTrial && watch("plan") !== "starter";
 
   useEffect(() => {
     let isActive = true;
@@ -122,7 +119,7 @@ function CreateTenant() {
       data.name,
       startingTrial
         ? { trial: true, trialCode: showCodeInput ? data.trialCode : null }
-        : { plan: data.plan }
+        : { plan: "starter" }
     );
 
     if (!tenant) {
@@ -149,6 +146,17 @@ function CreateTenant() {
           is_active: true,
         }),
     ]);
+
+    if (payingNow) {
+      const { data: checkout } = await startCheckout(tenant.id, data.plan, interval);
+      if (checkout?.url) {
+        window.location.assign(checkout.url);
+        return;
+      }
+      // The studio exists (on Starter); Membership lets them retry.
+      router.push("/dashboard/settings/membership?checkout=failed");
+      return;
+    }
 
     router.push("/dashboard");
   };
@@ -360,9 +368,14 @@ function CreateTenant() {
                 </span>
                 <p className="mb-3 text-xs text-brand-dark/50">
                   {trialUsed && "You've already used your free trial. "}
-                  Paid plans don&apos;t charge anything today — we&apos;ll ask for
-                  payment details later.
+                  Starter is free. For Studio or Pro Studio you&apos;ll enter payment
+                  details on the next step, on Stripe&apos;s secure checkout.
                 </p>
+                <IntervalToggle
+                  value={interval}
+                  onChange={setBillingInterval}
+                  className="mb-3"
+                />
                 <Controller
                   name="plan"
                   control={control}
@@ -406,13 +419,13 @@ function CreateTenant() {
                             </div>
                             <p className="mt-2 flex items-baseline gap-1">
                               <span className="text-xl font-semibold text-brand-dark">
-                                {plan.priceLabel}
+                                {plan.monthlyPrice == null
+                                  ? plan.priceLabel
+                                  : `$${(interval === "year" ? plan.yearlyPrice : plan.monthlyPrice).toLocaleString("en-US")}`}
                               </span>
-                              {plan.cadence && (
-                                <span className="text-xs text-brand-dark/50">
-                                  {plan.cadence}
-                                </span>
-                              )}
+                              <span className="text-xs text-brand-dark/50">
+                                {plan.monthlyPrice == null ? plan.cadence : `/${interval}`}
+                              </span>
                             </p>
                             <p className="mt-0.5 text-xs text-brand-dark/50">{plan.cap}</p>
                             <ul className="mt-3 space-y-1.5">
@@ -444,10 +457,14 @@ function CreateTenant() {
             <div className="mt-6 flex justify-end">
               <Button type="submit" disabled={submitting}>
                 {submitting
-                  ? "Creating…"
+                  ? payingNow
+                    ? "Opening checkout…"
+                    : "Creating…"
                   : startingTrial
                     ? "Start my free trial"
-                    : "Create Studio"}
+                    : payingNow
+                      ? "Continue to payment"
+                      : "Create Studio"}
               </Button>
             </div>
           </form>

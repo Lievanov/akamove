@@ -10,6 +10,7 @@ import {
   UserRound,
   NotebookPen,
 } from "lucide-react";
+import { YEARLY_DISCOUNT, planPrice } from "@/lib/billing/catalog.mjs";
 
 export const frontDesk = {
   id: "front-desk",
@@ -119,7 +120,9 @@ export const greenRoom = {
   ],
 };
 
-export const YEARLY_DISCOUNT = 0.15;
+// Prices come from the billing catalog so the site, the dashboard and
+// Stripe always agree.
+export { YEARLY_DISCOUNT };
 
 export const pricingTiers = [
   {
@@ -132,14 +135,14 @@ export const pricingTiers = [
   },
   {
     name: "Studio",
-    monthlyPrice: 75,
+    monthlyPrice: planPrice("studio"),
     cap: "Up to 100 monthly active students",
     tone: "solid",
     features: ["Everything in Starter", "Periods", "Reporting", "Roles"],
   },
   {
     name: "Pro Studio",
-    monthlyPrice: 150,
+    monthlyPrice: planPrice("pro studio"),
     cap: "Up to 500 monthly active students",
     tone: "outline",
     features: [
