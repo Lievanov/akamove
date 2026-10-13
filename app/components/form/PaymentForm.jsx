@@ -377,7 +377,7 @@ const PaymentForm = ({
                   value={studentClass}
                   onChange={classOnChange}
                   options={classes}
-                  getOptionLabel={(option) => option?.name ?? ""}
+                  getOptionLabel={(option) => option?.label ?? option?.name ?? ""}
                   multiple
                   placeholder="Select a Class"
                 />

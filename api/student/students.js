@@ -1,5 +1,6 @@
 import supabase from "@/lib/supabase/client";
 import { getActiveTenantId } from "@/lib/tenant/activeTenant";
+import { ilikeAny } from "@/lib/supabase/filters";
 
 export const getStudents = async (startPage, endPage, searchTerm) => {
   try {
@@ -7,7 +8,7 @@ export const getStudents = async (startPage, endPage, searchTerm) => {
       .from("all_students_by_last_payments_view")
       .select("*")
       .range(startPage, endPage)
-      .or(`full_name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
+      .or(ilikeAny(["full_name", "phone"], searchTerm));
 
     if (error) throw error;
     return data;
@@ -34,7 +35,7 @@ export const getStudentCountFiltered = async (searchTerm) => {
     let { count, error } = await supabase
       .from("all_students_by_last_payments_view")
       .select("id", { count: "exact", head: true })
-      .or(`full_name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
+      .or(ilikeAny(["full_name", "phone"], searchTerm));
     if (error) throw error;
     return count;
   } catch (error) {
@@ -184,7 +185,7 @@ export const getStudentsBylastPayment = async (
       .from("all_students_by_last_payments_view")
       .select("*")
       .range(startPage, endPage)
-      .or(`full_name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
+      .or(ilikeAny(["full_name", "phone"], searchTerm));
     if (error) throw error;
     return data;
   } catch (error) {

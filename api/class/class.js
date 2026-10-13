@@ -1,5 +1,6 @@
 import supabase from "@/lib/supabase/client";
 import { getActiveTenantId } from "@/lib/tenant/activeTenant";
+import { ilikeAny } from "@/lib/supabase/filters";
 
 export const getClasses = async (startPage, endPage, searchTerm) => {
   try {
@@ -7,7 +8,7 @@ export const getClasses = async (startPage, endPage, searchTerm) => {
       .from("class")
       .select("*")
       .range(startPage, endPage)
-      .or(`name.ilike.%${searchTerm}%`)
+      .or(ilikeAny(["name"], searchTerm))
       .eq("tenant_id", getActiveTenantId());
     if (error) throw error;
     return data;
@@ -21,7 +22,7 @@ export const getClassCountFiltered = async (searchTerm) => {
     let { count, error } = await supabase
       .from("class")
       .select("id", { count: "exact", head: true })
-      .or(`name.ilike.%${searchTerm}%`)
+      .or(ilikeAny(["name"], searchTerm))
       .eq("tenant_id", getActiveTenantId());
     if (error) throw error;
     return count;
@@ -32,15 +33,25 @@ export const getClassCountFiltered = async (searchTerm) => {
 
 export const getAllClasses = async () => {
   try {
-    let { data, error } = await supabase
-      .from("class")
-      .select("id, name, level, class_type, order")
-      .eq("tenant_id", getActiveTenantId());
+    const tenantId = getActiveTenantId();
+    const [classResult, typeResult] = await Promise.all([
+      supabase
+        .from("class")
+        .select("id, name, level, class_type, order")
+        .eq("tenant_id", tenantId),
+      supabase.from("class_type").select("id, name").eq("tenant_id", tenantId),
+    ]);
+    const { data, error } = classResult;
+    if (error) throw error;
+    // class.class_type has no foreign key, so join the type names here.
+    const typeNames = new Map((typeResult.data ?? []).map((t) => [t.id, t.name]));
+    // e.g. "Salsa Beginner 1"
     const updatedData = data.map((item) => ({
       ...item,
-      label: `${item.name} ${item.level}`,
+      label: [typeNames.get(item.class_type), item.name, item.level]
+        .filter((part) => part !== null && part !== undefined && part !== "")
+        .join(" "),
     }));
-    if (error) throw error;
     return updatedData;
   } catch (error) {
     console.error("Error retrieving classes from database");
@@ -136,9 +147,7 @@ export const getClassesByStudent = async (
       .order("last_name", { ascending: true });
 
     if (searchTerm) {
-      query = query.or(
-        `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,class_info.ilike.%${searchTerm}%`
-      );
+      query = query.or(ilikeAny(["first_name", "last_name", "phone", "class_info"], searchTerm));
     }
 
     if (period_name) {
@@ -160,9 +169,7 @@ export const getClassesByStudentCount = async (searchTerm, period_name) => {
       .select("id", { count: "exact", head: true });
 
     if (searchTerm) {
-      query = query.or(
-        `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,class_info.ilike.%${searchTerm}%`
-      );
+      query = query.or(ilikeAny(["first_name", "last_name", "phone", "class_info"], searchTerm));
     }
 
     if (period_name) {

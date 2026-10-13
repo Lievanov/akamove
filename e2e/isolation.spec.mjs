@@ -72,6 +72,61 @@ test.describe("signed out (public anon key)", () => {
   }
 });
 
+// Every relation the API exposes, read from PostgREST's OpenAPI spec, so a
+// table added later is tested without anyone remembering to list it.
+async function exposedRelations() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const res = await fetch("http://127.0.0.1:54321/rest/v1/", { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+  const { definitions } = await res.json();
+  return Object.entries(definitions).map(([name, def]) => ({ name, columns: Object.keys(def.properties ?? {}) }));
+}
+
+// Aggregate-only views: no row identity to compare across studios.
+const NO_ROW_KEY = ["active_vs_nonactive_students_view"];
+
+test.describe("RLS coverage", () => {
+  test("every exposed table and view is in ALL_RELATIONS (so the anon test covers it)", async () => {
+    const names = (await exposedRelations()).map((r) => r.name).sort();
+    expect(names).toEqual([...ALL_RELATIONS].sort());
+  });
+
+  test("every row an admin sees belongs to their own studio", async () => {
+    const pro = await clientAs(USERS.proAdmin.email);
+    const other = await clientAs(USERS.otherAdmin.email);
+    const { data: memberships } = await pro.from("user_tenant").select("tenant_id");
+    const proTenants = new Set(memberships.map((m) => m.tenant_id));
+    const failures = [];
+
+    for (const { name, columns } of await exposedRelations()) {
+      if (columns.includes("tenant_id")) {
+        const { data } = await pro.from(name).select("tenant_id");
+        const foreign = (data ?? []).filter((row) => !proTenants.has(row.tenant_id));
+        if (foreign.length) failures.push(`${name}: ${foreign.length} row(s) from another studio`);
+        continue;
+      }
+      if (NO_ROW_KEY.includes(name)) continue;
+      // No tenant_id (views, profiles, tenant): the two studios' admins
+      // must see disjoint rows.
+      const key = ["id", "student_id", "period_id", "code"].find((c) => columns.includes(c));
+      if (!key) {
+        failures.push(`${name}: no tenant_id or row key — add it to NO_ROW_KEY with a reason, or test it by hand`);
+        continue;
+      }
+      const [{ data: mine }, { data: theirs }] = await Promise.all([
+        pro.from(name).select(key),
+        other.from(name).select(key),
+      ]);
+      // Null keys are outer-join filler rows (e.g. payment_by_student_view's
+      // classes with no payment), not shared rows.
+      const theirKeys = new Set((theirs ?? []).map((row) => row[key]).filter((k) => k != null));
+      const shared = (mine ?? []).filter((row) => theirKeys.has(row[key]));
+      if (shared.length) failures.push(`${name}: ${shared.length} row(s) visible to both studios`);
+    }
+
+    expect(failures).toEqual([]);
+  });
+});
+
 test.describe("profiles", () => {
   test("a user sees their own profile and their teammates, nobody else", async () => {
     const pro = await clientAs(USERS.proAdmin.email);

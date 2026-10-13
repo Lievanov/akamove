@@ -1,4 +1,5 @@
 import supabase from "@/lib/supabase/client";
+import { ilikeAny } from "@/lib/supabase/filters";
 import { getActiveTenantId } from "@/lib/tenant/activeTenant";
 
 export const getPrivateLessons = async (startPage, endPage, searchTerm = "") => {
@@ -11,9 +12,7 @@ export const getPrivateLessons = async (startPage, endPage, searchTerm = "") => 
       .order("date_purchased", { ascending: false });
 
     if (searchTerm) {
-      query = query.or(
-        `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,instructor_name.ilike.%${searchTerm}%`
-      );
+      query = query.or(ilikeAny(["first_name", "last_name", "instructor_name"], searchTerm));
     }
 
     const { data, error } = await query;
@@ -31,9 +30,7 @@ export const getPrivateLessonCount = async (searchTerm = "") => {
       .select("id", { count: "exact", head: true });
 
     if (searchTerm) {
-      query = query.or(
-        `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,instructor_name.ilike.%${searchTerm}%`
-      );
+      query = query.or(ilikeAny(["first_name", "last_name", "instructor_name"], searchTerm));
     }
 
     const { count, error } = await query;

@@ -10,8 +10,10 @@ a checklist of stories, and open questions. Update the checklist in the same com
 
 - [002 — Keep same classes across periods + auto-create periods](002-same-period-and-auto-create.md) — built; waiting on migration 020 + a manual check (push notification decision deferred)
 
+- [006 — Security, abuse limits, privacy & legal compliance](006-security-privacy-compliance.md) — Phase 1 code done 2026-10-13; waiting on migrations 018–022 in the cloud project. Blocks 005
+
 ## Next
-- [006 — Security, abuse limits, privacy & legal compliance](006-security-privacy-compliance.md) — audit done 2026-10-12 (cron/automated-jobs audit 2026-10-13); blocks 005
+_None._
 
 ## Later
 - [003 — Native student apps (iOS / Android)](003-native-student-apps.md)

@@ -1,17 +1,6 @@
 import supabase from "@/lib/supabase/client";
 import { getActiveTenantId } from "@/lib/tenant/activeTenant";
-
-const notifyEventCreated = async (event) => {
-  try {
-    await fetch("/api/notifications/event", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(event),
-    });
-  } catch (error) {
-    console.error("Error sending event push notifications", error);
-  }
-};
+import { ilikeAny } from "@/lib/supabase/filters";
 
 export const getEvents = async (startPage, endPage, searchTerm = "") => {
   try {
@@ -23,7 +12,7 @@ export const getEvents = async (startPage, endPage, searchTerm = "") => {
       .order("created_at", { ascending: false });
 
     if (searchTerm.trim() !== "") {
-      query = query.or(`event_name.ilike.%${searchTerm}%`);
+      query = query.or(ilikeAny(["event_name"], searchTerm));
     }
 
     let { data, error } = await query;
@@ -42,7 +31,7 @@ export const getEventCountFiltered = async (searchTerm = "") => {
       .eq("tenant_id", getActiveTenantId());
 
     if (searchTerm.trim() !== "") {
-      query = query.or(`event_name.ilike.%${searchTerm}%`);
+      query = query.or(ilikeAny(["event_name"], searchTerm));
     }
 
     let { count, error } = await query;
@@ -74,9 +63,7 @@ export const createEvent = async (eventData) => {
       .insert([{ ...eventData, tenant_id: getActiveTenantId() }])
       .select();
     if (error) throw error;
-    const created = data && data.length > 0 ? data[0] : null;
-    if (created) await notifyEventCreated(created);
-    return created ?? true;
+    return data && data.length > 0 ? data[0] : true;
   } catch (error) {
     console.error("Error creating event in database", error);
     return false;

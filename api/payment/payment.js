@@ -1,4 +1,5 @@
 import supabase from "@/lib/supabase/client";
+import { ilikeAny } from "@/lib/supabase/filters";
 import { updateStudentCredit, updateStudentNotes } from "../student/students";
 import { getActiveTenantId } from "@/lib/tenant/activeTenant";
 
@@ -22,9 +23,7 @@ export const getPayments = async (startPage, endPage, searchTerm) => {
       .from("filtered_payment_view")
       .select(`*`)
       .range(startPage, endPage)
-      .or(
-        `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,payment_method.ilike.%${searchTerm}%`
-      )
+      .or(ilikeAny(["first_name", "last_name", "phone", "payment_method"], searchTerm))
       .order("created_at", { ascending: false });
     if (error) throw error;
     return data;
@@ -67,9 +66,7 @@ export const getPaymentCountFiltered = async (searchTerm) => {
         count: "exact",
         head: true,
       })
-      .or(
-        `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,payment_method.ilike.%${searchTerm}%`
-      );
+      .or(ilikeAny(["first_name", "last_name", "phone", "payment_method"], searchTerm));
     if (error) throw error;
     return count;
   } catch (error) {

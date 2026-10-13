@@ -7,8 +7,8 @@ depends_on: []
 
 ## Goal
 A student-facing mobile app (iOS + Android) for aka Move studios. Its exact scope will be
-defined in the stories below. The push notification infrastructure (`profiles.push_token`,
-`app/api/notifications/*`) and account deletion flow already anticipate this app.
+defined in the stories below. `profiles.push_token` and the account deletion flow already anticipate this app. The old
+`app/api/notifications/*` routes were removed (006, C1) and need rebuilding.
 
 ## Stories — planning
 - [ ] Decide on the tech stack (Expo / React Native fits the existing Expo push setup)
@@ -26,7 +26,9 @@ defined in the stories below. The push notification infrastructure (`profiles.pu
 - [ ] Check-in (→ 004)
 - [ ] Events: browse and see pricing (advance vs. day-of)
 - [ ] Book private lessons
-- [ ] Push notifications: new period live, events, reminders
+- [ ] Push notifications: new period live, events, reminders. Rebuild the send routes per 006 C1:
+      bearer token + admin of the studio, load the period/event server-side by id, only that
+      studio's users' tokens, at most one send per period/event, rate-limited
 - [ ] In-app payments (Stripe), with store-policy implications to check
 
 ## Open questions

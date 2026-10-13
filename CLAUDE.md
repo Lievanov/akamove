@@ -52,7 +52,7 @@ The application manages these main entities (see `api/db.sql`):
 - `api/` - Backend data-access modules organized by entity (`class`, `credit`, `events`, `punch_pass`, `instructor`, `location`, `notes`, `payment`, `period`, `private_lesson`, `profiles`, `settings`, `student`, `charts`)
 - `app/` - Next.js App Router pages and components
   - `dashboard/` - Main application interface with nested routes (see Dashboard Sections below)
-  - `api/` - Next.js Route Handlers for account deletion and push notifications
+  - `api/` - Next.js Route Handlers for account deletion and Stripe billing
   - `components/` - Reusable components organized by function (`ui/` — shared Tailwind kit, `form/`, `charts/`, `lists/`, `notes/`, `oauth/`, `utils/`)
   - `delete-account/` - Public account-deletion request page (Play Store compliance)
 - `lib/supabase/` - Supabase client configuration
@@ -76,8 +76,9 @@ The application manages these main entities (see `api/db.sql`):
 - **Charts**: In `app/components/charts/` - Analytics and data visualization (active/inactive students, student count by period, class-by-period breakdowns, events by period, private lessons by period, period revenue summary, total students)
 - **Navigation**: Dashboard uses sidebar navigation via `DashboardNavbar`, gated by `app/dashboard/layout.jsx`'s role-based access check
 - **Authentication**: Google OAuth handled by `GoogleOAuth.jsx`
-- **Push Notifications**: Route handlers at `app/api/notifications/period` and `app/api/notifications/event` broadcast to all registered Expo push tokens when a period or event goes live. **Note**: there is currently no live student-facing mobile app — this infrastructure (and the `profiles.push_token` column) predates/anticipates one but has no active consumer right now.
-- **Account Deletion**: `app/api/account/delete` and `app/api/account/delete-request` back the public `app/delete-account` deletion flow required for Play Store compliance (the in-app deletion path it also mentions assumes the not-yet-existing mobile app)
+- **Push Notifications**: none are sent today. The old `app/api/notifications/*` routes were removed (backlog 006, C1: unauthenticated, notified every studio's users); rebuild them with auth and per-studio tokens when the mobile app (backlog 003) ships. `profiles.push_token` is kept for that app.
+- **Account Deletion**: `app/api/account/delete` and `app/api/account/delete-request` back the public `app/delete-account` deletion flow required for Play Store compliance (the in-app deletion path it also mentions assumes the not-yet-existing mobile app). A studio's only admin is refused (409). Requests are processed by hand per `docs/runbooks/deletion-requests.md`
+- **Server-only code**: `lib/supabase/admin.js` (service role, bypasses RLS) imports `server-only`; never import it from client code. Search filters passed to `.or()` go through `ilikeAny` (`lib/supabase/filters.js`) so user input can't add filters
 - **UI Components**: `app/components/ui/` holds the Tailwind + Radix UI component kit (`Button`, `TextInput`, `Select`, `Combobox`, `DatePicker`, `Dialog`, `Tabs`, `Checkbox`, `Switch`, `Chip`, `ClassChips`, `PriceListEditor`, `Table`, `Pagination`, `Alert`, `Toast`, `PageHeader`, `BackButton`) used throughout the app. See the `tailwind-ui-kit` skill (`.claude/skills/tailwind-ui-kit/SKILL.md`) for the full inventory and brand tokens.
 
 ### Database Integration
@@ -108,6 +109,7 @@ await fetch("https://exp.host/--/api/v2/push/send", {
 });
 
 Rules:
+- Any route that sends must verify the caller (bearer token + admin of the studio), load the period/event server-side by id, send only to that studio's users' tokens, and send at most once per period/event (backlog 006, C1).
 - push_token may be null if the student denied permissions — always check before sending.
 - To send to multiple students, pass an array of token objects to the same endpoint (up to 100 per batch).
 - EPNS is free and handles APNs/FCM routing — do not call APNs or FCM directly.

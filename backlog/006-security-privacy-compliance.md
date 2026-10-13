@@ -1,5 +1,5 @@
 ---
-status: next
+status: in-progress
 priority: critical
 depends_on: []
 ---
@@ -14,8 +14,25 @@ needs. Must be finished before production launch (→ 005).
 Audit done 2026-10-12 against branch `fix/impeccable-audit` (code + `supabase/migrations/`
 baseline + pending migrations 018–021). Findings are listed first; stories follow by phase.
 
+**How to read the stories:** `[blocker]` must be done before production launch (005);
+`[post-launch]` can follow it. Each phase ends with a **Done when** check that proves the fixes
+work. Every story names the finding it closes (C/H/M/J/L ids). Business items that code can't
+tick off are in their own checklist at the end.
+
 > The legal items below are an engineering checklist, not legal advice. Phase 4 includes
 > having a lawyer review the documents before launch.
+
+## Threat model
+Who we defend against, and what each one can do today:
+
+| Attacker | Has | Main risk | Covered by |
+|---|---|---|---|
+| Anonymous bot | the public anon key, our URLs | spam email/push sends, junk rows, cost run-up | C1, H2, H3, J4 |
+| Another studio | a valid login in its own studio | reading/writing our rows | RLS + `e2e/isolation.spec.mjs`, L1 |
+| Staff member (malicious or careless) | a staff login in our studio | edit payments, delete records, act on a Starter plan | H1, M3 |
+| Former staff member | a session issued before removal | keeps access until the token expires | L5 |
+| Session thief | a stolen admin session | change payments/billing | M2 (MFA), M1 (CSP) |
+| Someone else's email typed in | `/delete-account` | gets another person's account deleted | H5 |
 
 ## Findings
 
@@ -108,6 +125,24 @@ invocations. Neither job is a cost risk; the risks are jobs that stop running wi
   `cron.schedule` calls, so local/test DBs have no jobs, and nothing checks that the cloud project has exactly
   the two expected jobs. `cron.schedule(name, …)` upserts by name, so re-running 011/020 is safe and won't add duplicates.
 
+### Found in the 2026-10-13 review
+- **L1 — RLS tests only cover the tables someone remembered.** `e2e/isolation.spec.mjs`
+  hard-codes its table lists, so a new table with a missing or wrong policy goes untested.
+- **L2 — PostgREST filter injection in search.** `api/student/students.js`, `api/class/class.js`
+  and `api/events/events.js` build `.or(\`col.ilike.%${searchTerm}%\`)` from raw input; a comma,
+  dot or parenthesis in the search adds filters or breaks the query. RLS keeps it inside the
+  user's own studio, so impact is low.
+- **L3 — Nothing stops the service-role client reaching the browser.** `lib/supabase/admin.js`
+  only has a comment saying not to import it from client code.
+- **L4 — PII in logs.** The notification routes log Expo's full response (push tokens).
+- **L5 — Removed staff keep their session.** Deleting a `user_tenant` row doesn't revoke the
+  user's JWT; RLS re-checks membership per request, so data access stops, but a session isn't
+  ended (check that every server route also re-checks membership, not just the token).
+- Data quirk (not a leak): `payment_by_student_view` `FULL JOIN`s `class`, so classes with no
+  payment show up as a row with a null `id`. Each studio only sees its own.
+- Checked, no issue: no Supabase Storage usage; OAuth / magic-link / reset redirects are built
+  from `window.location.origin`, and no route reads a `next`/`redirect` parameter.
+
 ### Already good (keep)
 - Stripe webhook verifies signatures on the raw body and is idempotent (`stripe_event`).
 - Billing routes verify the bearer token and admin membership server-side; plans only change
@@ -118,99 +153,129 @@ invocations. Neither job is a cost risk; the risks are jobs that stop running wi
 - No `dangerouslySetInnerHTML` / `eval`; OAuth/email redirects use the app's own origin.
 - Tests run against local Supabase, never the cloud project.
 
-## Stories — Phase 1: stop the bleeding (before any real data / users)
-- [ ] Apply migrations 018–021 to the cloud project; run the verification scripts; commit them (C2)
-- [ ] Notification routes: require bearer token + admin of the period's/event's studio, load
-      the period/event server-side by id (don't trust the body), send only to tokens of that
-      studio's users, cap one send per period/event (C1)
-- [ ] Or, since there's no mobile app yet: disable the notification routes until 003 ships (C1)
-- [ ] Fix account deletion: `invited_by ON DELETE SET NULL`, block or hand over when the user
-      is a studio's only admin, cancel the studio's Stripe subscription if it's being removed (H4)
-- [ ] Written procedure for `deletion_requests`: verify ownership by emailing the address,
-      30-day SLA, log outcome (H5)
+## Decisions (proposed 2026-10-13 — change them here if you disagree)
+- **Notification routes:** disabled until the mobile app (003) exists. When 003 ships, rebuild
+  them with auth, per-studio tokens and one send per period/event.
+- **Rate limiter:** Postgres-backed (`rate_limit` table + RPC) — no new vendor or subprocessor.
+- **Staff rights:** staff create students, payments, punches and notes; they can't edit
+  payment amounts or delete anything. Admins can do everything.
+- **Sole admin deleting their account:** refused until they promote another admin or
+  contact support. Studio data deletion waits on the retention policy (Phase 4).
+
+## Stories — Phase 1: stop the bleeding
+- [ ] `[blocker]` Apply migrations 018–022 to the cloud project; run the verification scripts; commit them (C2)
+- [x] `[blocker]` Disable the notification routes until 003 ships (C1, L4) — routes and the
+      client calls removed; rebuilding them with auth is a 003 story
+- [x] `[blocker]` Account deletion: `tenant_invite.invited_by ON DELETE SET NULL` (migration 022);
+      refuse with 409 when the user is a studio's only admin (H4). No Stripe cancel needed while
+      the studio is never removed
+- [x] `[blocker]` Written procedure for `deletion_requests` (H5) — `docs/runbooks/deletion-requests.md`
+- [x] `[blocker]` Escape search input in `.or()` filters (L2)
+- [x] `[blocker]` `import "server-only"` in `lib/supabase/admin.js` (L3)
+- [x] `[blocker]` RLS coverage test: fail when a table exposed by the API isn't in the isolation
+      spec's lists, or has a `tenant_id` but no cross-studio test (L1)
+
+**Done when:** `curl -X POST <host>/api/notifications/period` returns 404; 021's checks pass
+on the cloud project; an e2e test deletes a user who sent an invite (200) and a sole admin (409);
+`npm test` is green.
 
 ## Stories — Phase 2: enforce on the server what the UI enforces
-- [ ] RLS: role-aware policies — admin-only writes on `period`, `period_location_class`,
-      `instructors`, `location`; decide staff rights on `payment` update and the deletes in M3 (H1, M3)
-- [ ] RLS: make `is_tenant_member` (or a new helper) return false for non-admins on Starter /
-      expired trials, matching `planAllowsRole` (H1)
-- [ ] DB trigger enforcing per-plan student limits on `student` insert (H1)
-- [ ] E2E specs in `e2e/access.spec.mjs` that call Supabase directly as staff and assert the
-      writes are refused (not just that the page is hidden)
-- [ ] Revoke `anon` grants on all tenant tables; set `statement_timeout` for `anon` and
+- [ ] `[blocker]` RLS: role-aware policies per the staff-rights decision — admin-only writes on
+      `period`, `period_location_class`, `instructors`, `location`, payment amount updates and
+      all deletes (H1, M3)
+- [ ] `[blocker]` RLS: `is_tenant_member` (or a new helper) returns false for non-admins on
+      Starter / expired trials, matching `planAllowsRole` (H1)
+- [ ] `[blocker]` DB trigger enforcing per-plan student limits on `student` insert (H1)
+- [ ] `[blocker]` E2E specs that call Supabase directly as staff and assert the writes are refused
+- [ ] `[blocker]` Server routes re-check membership on every call, not just token validity (L5)
+- [ ] `[post-launch]` Revoke `anon` grants on all tenant tables; set `statement_timeout` for `anon` and
       `authenticated`; confirm API max rows (M5)
-- [ ] Length `CHECK` constraints on free-text columns (M4)
-- [ ] Audit log table (who, what, when, before/after) for payment, student and punch changes (M3)
+- [ ] `[post-launch]` Length `CHECK` constraints on free-text columns (M4)
+- [ ] `[post-launch]` Audit log table (who, what, when, before/after) for payment, student and punch changes (M3)
+
+**Done when:** as staff, direct Supabase calls to update a payment amount, delete a class or
+insert a period all fail; as staff on Starter every tenant query returns nothing; inserting
+student N+1 over the plan limit fails.
 
 ## Stories — Phase 3: rate limits, bots and cost ceilings
-- [ ] Captcha (Cloudflare Turnstile — Supabase Auth supports it natively) on sign-up, login,
+- [ ] `[blocker]` Captcha (Cloudflare Turnstile — Supabase Auth supports it natively) on sign-up, login,
       password reset, magic link and `/delete-account` (H2)
-- [ ] Rate limiter for Next route handlers (per IP + per user), e.g. a Postgres-backed
-      `rate_limit` table/RPC or Upstash; apply to every `app/api/*` route (H2)
-- [ ] Cloud Supabase Auth rate limits reviewed (emails/hour, sign-ins, token refresh, OTP) (H2)
-- [ ] Custom SMTP (Resend / Postmark / SES) with its own sending cap — Supabase's built-in SMTP
+- [ ] `[blocker]` Postgres rate limiter for Next route handlers (per IP + per user), applied to
+      every `app/api/*` route except the Stripe webhook (H2)
+- [ ] `[blocker]` Cloud Supabase Auth rate limits reviewed (emails/hour, sign-ins, token refresh, OTP) (H2)
+- [ ] `[blocker]` Custom SMTP (Resend / Postmark / SES) with its own sending cap — Supabase's built-in SMTP
       is for testing only (H2)
-- [ ] Cap studios per user (e.g. 3) in `create_tenant_and_admin`; throttle trial-code attempts (H2)
-- [ ] Hard caps: `maxInstances` in `apphosting.yaml`, Supabase spend cap left ON, Firebase
+- [ ] `[blocker]` Cap studios per user (e.g. 3) in `create_tenant_and_admin`; throttle trial-code attempts (H2)
+- [ ] `[blocker]` Hard caps: `maxInstances` in `apphosting.yaml`, Supabase spend cap left ON, Firebase
       budget alerts at 50/90/100 %, optional budget → Pub/Sub → disable-billing kill switch (H3)
-- [ ] Put the domain behind Cloudflare (free tier: WAF, bot fight mode, rate-limit rules, DDoS) (H2, H3)
-- [ ] Decide trial abuse policy (M6)
-- [ ] Verify cloud cron state: `select jobname, schedule, active from cron.job;` returns exactly
+- [ ] `[blocker]` Reconcile scheduled on the new host — Cloud Scheduler story in 005 (J1)
+- [ ] `[blocker]` Verify cloud cron state: `select jobname, schedule, active from cron.job;` returns exactly
       `expire-due-trials` and `auto-create-periods`, and
       `select jobname, status, count(*) from cron.job_run_details join cron.job using (jobid)
       where start_time > now() - interval '7 days' group by 1, 2;` shows no failures (J5)
-- [ ] Weekly `pg_cron` purge: `cron.job_run_details` older than 30 days, `stripe_event`
+- [ ] `[post-launch]` Weekly `pg_cron` purge: `cron.job_run_details` older than 30 days, `stripe_event`
       processed more than 90 days ago (J4)
-- [ ] Reconcile: page through `tenant_billing` (cursor + batch per run, or skip rows synced in the
+- [ ] `[post-launch]` Reconcile: page through `tenant_billing` (cursor + batch per run, or skip rows synced in the
       last 24 h by webhook), and only write when Stripe's state differs from ours (J2)
-- [ ] Alerting: a daily check (e.g. inside reconcile) that reports failed `cron.job_run_details`
+- [ ] `[post-launch]` Alerting: a daily check (e.g. inside reconcile) that reports failed `cron.job_run_details`
       runs and reconcile `failed[]` to the error monitor / an email (J3)
+- [ ] `[post-launch]` Put the domain behind Cloudflare (free tier: WAF, bot fight mode, rate-limit rules, DDoS) (H2, H3)
+- [ ] `[post-launch]` Decide trial abuse policy (M6)
+
+**Done when:** the 6th password-reset request in a minute from one IP is refused; sign-up
+without a captcha token fails; a user can't create a 4th studio; the billing alert fires in a
+test budget.
 
 ## Stories — Phase 4: privacy & legal
-- [ ] **Privacy Policy** page: what we collect (staff accounts, student names, emails, phone,
+- [ ] `[blocker]` **Privacy Policy** page: what we collect (staff accounts, student names, emails, phone,
       date of birth, payments), why, subprocessors (Supabase, Google/Firebase, Stripe, Expo,
       email provider), retention, rights requests, contact. Linked from footer, sign-up, login
-- [ ] **Terms of Service**: subscription + auto-renewal terms, trial terms, cancellation and
+- [ ] `[blocker]` **Terms of Service**: subscription + auto-renewal terms, trial terms, cancellation and
       refunds, acceptable use, studio is responsible for having consent for the student data
       it enters (incl. parental consent for minors), limitation of liability, governing law
-- [ ] **Data Processing Addendum (DPA)** for studios — we're their processor for student data;
+- [ ] `[blocker]` **Data Processing Addendum (DPA)** for studios — we're their processor for student data;
       published subprocessor list
-- [ ] Record acceptance of the Terms at sign-up (version + timestamp per user)
-- [ ] Auto-renewal compliance (e.g. California ARL): clear price/renewal disclosure before
+- [ ] `[blocker]` Record acceptance of the Terms at sign-up (version + timestamp per user)
+- [ ] `[blocker]` Auto-renewal compliance (e.g. California ARL): clear price/renewal disclosure before
       checkout, reminder before trial converts and before annual renewal (Stripe Billing can
       email these), online cancellation (already have), notice before price changes
-- [ ] Minors: no student logins until 003; when 003 is planned, COPPA review for under-13 users
-- [ ] Data retention policy: how long after a studio cancels we keep its data, then delete;
+- [ ] `[blocker]` Google OAuth consent screen verification (needs privacy policy + terms URLs + domain)
+- [ ] `[blocker]` Data retention policy: how long after a studio cancels we keep its data, then delete;
       payment records kept for tax as required
-- [ ] Studio data export (CSV of students, payments) — portability requests and no lock-in
-- [ ] Data subject requests: a studio can delete/export one student; documented process for
+- [ ] `[post-launch]` Studio data export (CSV of students, payments) — portability requests and no lock-in
+- [ ] `[post-launch]` Data subject requests: a studio can delete/export one student; documented process for
       students who contact us directly (we forward to the studio)
-- [ ] Google OAuth consent screen verification (needs privacy policy + terms URLs + domain)
-- [ ] Accessibility statement + WCAG 2.1 AA pass (ADA web lawsuits) — overlaps the impeccable audit
-- [ ] Lawyer review of Privacy Policy, Terms, DPA before launch
-- [ ] Business: operate through an LLC; get cyber liability + tech E&O insurance
+- [ ] `[post-launch]` Minors: no student logins until 003; when 003 is planned, COPPA review for under-13 users
+- [ ] `[post-launch]` Accessibility statement + WCAG 2.1 AA pass (ADA web lawsuits) — overlaps the impeccable audit
+
+**Done when:** `/privacy` and `/terms` are live and linked from sign-up/login/footer; a new
+sign-up stores the terms version; the OAuth consent screen is verified.
 
 ## Stories — Phase 5: ongoing hygiene
-- [ ] Upgrade Next.js to a supported major (15/16) and React accordingly; re-run e2e (C3)
-- [ ] Security headers incl. CSP in `next.config.mjs` (M1)
-- [ ] Auth: 8+ char passwords with requirements, leaked-password protection, optional TOTP MFA
-      for admins (M2)
-- [ ] GitHub: Dependabot alerts + updates, secret scanning + push protection, branch protection on `main`
-- [ ] CI: lint, `npm audit --omit=dev`, e2e on every PR
-- [ ] MFA on every vendor account (GitHub, Supabase, Stripe, Google Cloud/Firebase, domain registrar, email)
-- [ ] Use a Stripe restricted key (`rk_live_…`) with only the permissions billing needs
-- [ ] Error monitoring (e.g. Sentry) with PII scrubbing; no student data in logs
-- [ ] Backups: Supabase Pro daily backups (+ PITR if affordable); test a restore once
-- [ ] Incident response plan: who to call, how to rotate keys, breach-notification obligations
+- [ ] `[blocker]` Upgrade Next.js to a supported major (15/16) and React accordingly; re-run e2e (C3)
+- [ ] `[blocker]` Security headers incl. CSP in `next.config.mjs` (M1)
+- [ ] `[blocker]` Auth: 8+ char passwords with requirements, leaked-password protection (M2)
+- [ ] `[blocker]` Use a Stripe restricted key (`rk_live_…`) with only the permissions billing needs
+- [ ] `[blocker]` Backups: Supabase Pro daily backups (+ PITR if affordable); test a restore once
+- [ ] `[post-launch]` Optional TOTP MFA for admins (M2)
+- [ ] `[post-launch]` GitHub: Dependabot alerts + updates, secret scanning + push protection, branch protection on `main`
+- [ ] `[post-launch]` CI: lint, `npm audit --omit=dev`, e2e on every PR
+- [ ] `[post-launch]` Error monitoring (e.g. Sentry) with PII scrubbing; no student data in logs
+- [ ] `[post-launch]` Incident response plan: who to call, how to rotate keys, breach-notification obligations
       (US state laws; GDPR 72h if EU users)
-- [ ] Re-run this audit before each major release
+- [ ] `[post-launch]` Re-run this audit before each major release
+
+**Done when:** `npm audit --omit=dev` shows no high/critical; securityheaders.com grades A;
+a backup restore has been done once.
+
+## Business checklist (not code)
+- [ ] Lawyer review of Privacy Policy, Terms, DPA before launch
+- [ ] Operate through an LLC; get cyber liability + tech E&O insurance
+- [ ] MFA on every vendor account (GitHub, Supabase, Stripe, Google Cloud/Firebase, domain registrar, email)
 
 ## Open questions
 - Where are the studios (and their students)? US only, or also EU/UK/Latin America? This
   decides whether GDPR / LGPD / other regimes apply and the governing law in the Terms.
-- Notification routes: secure them now, or disable until the mobile app (003) exists?
-- What may staff do? Edit payment amounts? Delete classes, events, notes?
 - Trials: keep no-card trials (simpler sign-up, more abuse) or require a card at trial start?
-- Rate limiter: Postgres table (no new vendor) or Upstash (simpler, one more subprocessor)?
 - Does Cloudflare go in front of Firebase App Hosting, or rely on Google's edge only?
 - How long do we keep a cancelled studio's data before deleting it?

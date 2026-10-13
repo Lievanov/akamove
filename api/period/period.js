@@ -4,18 +4,6 @@ import { getEventRevenueInRange } from "../events/event_payment";
 import { getPassRevenueInRange } from "../punch_pass/punch_pass";
 import { getActiveTenantId } from "@/lib/tenant/activeTenant";
 
-const notifyPeriodCreated = async (period) => {
-  try {
-    await fetch("/api/notifications/period", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(period),
-    });
-  } catch (error) {
-    console.error("Error sending period push notifications", error);
-  }
-};
-
 export const getLatestPeriod = async () => {
   try {
     let { data, error } = await supabase
@@ -98,7 +86,6 @@ export const createPeriod = async ({ start_date, end_date, prices, name }) => {
       .select("id")
       .single();
     if (error) throw error;
-    await notifyPeriodCreated({ id: data.id, name });
     return data.id;
   } catch (error) {
     console.error("Error creating period in database");
