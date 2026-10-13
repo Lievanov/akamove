@@ -15,15 +15,13 @@ import {
 } from "./HomeCard";
 
 function ClassRow({ item, periodId }) {
-  const params = new URLSearchParams({ searchParam: item.label });
-  if (periodId) params.set("periodId", periodId);
   return (
     <li className="flex items-center gap-4 py-2.5">
       <span className="w-20 shrink-0 text-sm font-medium tabular-nums text-brand-dark">
         {formatTime(item.time)}
       </span>
       <Link
-        href={`/dashboard/classes?${params.toString()}`}
+        href={`/dashboard/classes/${item.classId}?periodId=${periodId}`}
         className="flex min-w-0 flex-1 items-center gap-2 rounded text-sm text-brand-dark hover:text-brand-pink-deep hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-pink"
       >
         <span

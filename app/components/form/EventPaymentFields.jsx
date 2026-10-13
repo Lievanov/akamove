@@ -1,5 +1,4 @@
 "use client";
-import { Checkbox } from "@/app/components/ui/Checkbox";
 import { Combobox } from "@/app/components/ui/Combobox";
 import TextInput from "@/app/components/ui/TextInput";
 
@@ -8,23 +7,11 @@ const EventPaymentFields = ({
   errors,
   events,
   isEventPayment,
-  setIsEventPayment,
   onSelectEvent,
   renderPaymentAmountField,
-  showEventToggle = true,
 }) => {
   return (
     <>
-      {showEventToggle && (
-        <div className="mb-2">
-          <Checkbox
-            checked={isEventPayment}
-            onCheckedChange={setIsEventPayment}
-            label="Is Event Payment"
-          />
-        </div>
-      )}
-
       {isEventPayment && (
         <div className="space-y-4">
           <Combobox

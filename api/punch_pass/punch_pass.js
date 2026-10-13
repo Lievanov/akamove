@@ -1,5 +1,6 @@
 import supabase from "@/lib/supabase/client";
 import { getActiveTenantId } from "@/lib/tenant/activeTenant";
+import { ilikeAny } from "@/lib/supabase/filters";
 
 // Punch passes (migration 019): a student buys N entries and each class
 // they attend is recorded as an entry against the pass. Remaining entries
@@ -327,4 +328,44 @@ export const getPassSalesInRange = async (startDate, endDate) => {
 export const getPassRevenueInRange = async (startDate, endDate) => {
   const sales = await getPassSalesInRange(startDate, endDate);
   return sales.reduce((sum, row) => sum + (Number(row.price) || 0), 0);
+};
+
+// --- Payments → Punch passes tab -----------------------------------------
+
+// One page of pass sales, newest first, with the count for pagination.
+// Search matches the pass name or the student's name or phone.
+export const getPassSales = async (from, to, search) => {
+  try {
+    const tenantId = getActiveTenantId();
+    let query = supabase
+      .from("punch_pass")
+      .select(
+        `id, name, total_entries, price, payment_method, purchased_on, expires_on, created_at,
+        student_id, student:student_id(first_name, last_name),
+        entries:punch_pass_entry(id)`,
+        { count: "exact" }
+      )
+      .eq("tenant_id", tenantId)
+      .order("purchased_on", { ascending: false })
+      .order("created_at", { ascending: false })
+      .range(from, to);
+    if (search) {
+      // PostgREST can't OR across an embedded table, so match students first.
+      const { data: students, error: studentError } = await supabase
+        .from("student")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .or(ilikeAny(["first_name", "last_name", "phone"], search));
+      if (studentError) throw studentError;
+      const ids = (students ?? []).map((s) => s.id);
+      const nameFilter = ilikeAny(["name"], search);
+      query = query.or(ids.length ? `${nameFilter},student_id.in.(${ids.join(",")})` : nameFilter);
+    }
+    const { data, count, error } = await query;
+    if (error) throw error;
+    return { rows: data ?? [], count: count ?? 0 };
+  } catch (error) {
+    console.error("Error retrieving punch pass sales", error);
+    return { rows: undefined, count: 0 };
+  }
 };

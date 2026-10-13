@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 
 import PaymentForm from "@/app/components/form/PaymentForm";
 import Loading from "@/app/components/Loading";
@@ -12,15 +12,20 @@ import { Toast } from "@/app/components/ui/Toast";
 import { PageHeader } from "@/app/components/ui/PageHeader";
 import { useFlashAlert } from "@/app/components/utils/useFlashAlert";
 import ClassesByPayment from "@/app/components/lists/ClassesByPayment";
+import PunchPassForm from "@/app/components/form/PunchPassForm";
+import { getPassTypes } from "@/api/punch_pass/punch_pass";
 
 function NewPayment() {
   const router = useRouter();
   const { studentId } = useParams();
+  // ?sell=punch-pass (from the Payments list) opens on the Punch pass tab.
+  const searchParams = useSearchParams();
   const [student, setStudent] = useState({});
   const [period, setPeriod] = useState({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [alert, setAlert] = useFlashAlert();
+  const [passTypes, setPassTypes] = useState([]);
 
   useEffect(() => {
     getStudent();
@@ -29,6 +34,7 @@ function NewPayment() {
   const getStudent = async () => {
     setPeriod(await getLatestPeriod());
     setStudent(await getStudentById(studentId));
+    setPassTypes((await getPassTypes()) ?? []);
     setLoading(false);
   };
 
@@ -93,6 +99,13 @@ function NewPayment() {
     }
   };
 
+  // Show the new pass on the student's page, where entries are recorded.
+  const onPassSold = () => {
+    router.push(
+      `/dashboard/students/${studentId}?text=Punch+pass+sold+to+${student.first_name}+${student.last_name}.&severity=success`
+    );
+  };
+
   if (loading) return <Loading variant="form-page" />;
 
   return (
@@ -122,6 +135,15 @@ function NewPayment() {
             period={period}
             student={student}
             isSubmitting={submitting}
+            defaultTab={searchParams.get("sell") === "punch-pass" ? "punch-pass" : "classes"}
+            punchPassPanel={
+              <PunchPassForm
+                inline
+                studentId={studentId}
+                passTypes={passTypes}
+                onSaved={onPassSold}
+              />
+            }
           />
         </div>
         <div className="lg:col-span-5">

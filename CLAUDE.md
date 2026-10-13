@@ -60,13 +60,13 @@ The application manages these main entities (see `api/db.sql`):
 ### Dashboard Sections (`app/dashboard/`)
 
 - **Students** (`students/`) - Roster, student detail/edit pages, new-student flow. The detail page holds the punch pass card (sell a pass, record/correct/undo entries)
-- **Classes** (`classes/`) - Class list and bulk update flow
+- **Classes** (`classes/`) - Class catalog by type with each class's weekly schedule and enrollment count for a period (`?periodId=`, default latest); `classes/[id]` is a class's roster (schedule + students who paid for it). Bulk update flow in `classes/update`
 - **Periods** (`periods/`) - Create/edit periods, per-location schedules, class assignment
 - **Instructors** (`instructors/`) - Instructor roster and detail pages
 - **Locations** (`locations/`) - Studio location roster and detail pages
 - **Events** (`events/`) - Event roster, detail, and creation, with day-of vs. advance pricing
 - **Private Lessons** (`private-lessons/`) - Lesson roster, detail pages, and a dedicated **reports** view (period revenue: classes + private lessons + events by date range)
-- **Payments** (`payments/`) - Payment roster, per-student payment history, and edit flow
+- **Payments** (`payments/`) - Tabs (`?tab=`): payments roster, Enrollments (who paid for which class, by period) and Punch passes (pass sales). `payments/[studentId]` records a payment with Classes / Event / Punch pass tabs (`?sell=punch-pass` opens the last); plus the edit flow
 - **Notes** (`notes/`) - Student notes
 - **Settings** (`settings/`) - Default class prices, private-lesson studio fee, studio timezone; punch pass types (`settings/punch-passes/`)
 

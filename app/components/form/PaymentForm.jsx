@@ -16,6 +16,7 @@ import {
   DialogActions,
 } from "@/app/components/ui/Dialog";
 import { Input } from "@/app/components/ui/Input";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/app/components/ui/Tabs";
 import { getLastestThreePeriods } from "@/api/period/period";
 import { getUpcomingEvents } from "@/api/events/events";
 import { getTimezone, DEFAULT_TIMEZONE } from "@/api/settings/settings";
@@ -33,6 +34,9 @@ const PaymentForm = ({
   presetEvent = null,
   showEventToggle = true,
   isSubmitting = false,
+  // Optional "Punch pass" tab content (a pass sale isn't a payment row).
+  punchPassPanel = null,
+  defaultTab = "classes",
 }) => {
   const [classes, setClasses] = useState([]);
   const [studentClass, setStudentClass] = useState([]);
@@ -41,6 +45,7 @@ const PaymentForm = ({
   const [loading, setLoading] = useState(true);
   const [isEdit, setIsEdit] = useState(false);
   const [isEventPayment, setIsEventPayment] = useState(defaultIsEventPayment);
+  const [tab, setTab] = useState(defaultIsEventPayment ? "event" : defaultTab);
   const [creditDialogOpen, setCreditDialogOpen] = useState(false);
   const [useCredit, setUseCredit] = useState(null); // null = not decided yet
   const [originalCredit, setOriginalCredit] = useState(0);
@@ -104,6 +109,13 @@ const PaymentForm = ({
   useEffect(() => {
     setIsEventPayment(defaultIsEventPayment);
   }, [defaultIsEventPayment]);
+
+  // Tabs pick what's being paid for; editing keeps the payment's own kind.
+  const showTabs = showEventToggle && !payment;
+  const onTabChange = (value) => {
+    setTab(value);
+    if (value !== "punch-pass") setIsEventPayment(value === "event");
+  };
 
   const initEditPayment = async () => {
     const classList = await getClasses();
@@ -301,6 +313,90 @@ const PaymentForm = ({
     </>
   );
 
+  const paymentForm = (
+    <form onSubmit={handleSubmit(preSubmit)}>
+      <div className={showTabs ? "space-y-4" : "space-y-4 border-t border-brand-dark/10 pt-6"}>
+        {!isEventPayment && period?.name && (
+          <p className="pb-1 text-base text-brand-dark/60">
+            Current Period: {period.name}
+          </p>
+        )}
+        <EventPaymentFields
+          control={control}
+          errors={errors}
+          events={events}
+          isEventPayment={isEventPayment}
+          onSelectEvent={handleEventSelect}
+          renderPaymentAmountField={renderPaymentAmountField}
+        />
+
+        {isEventPayment && hasStudent ? renderCreditFields() : null}
+
+        {isEventPayment ? null : (
+          <>
+            <Select
+              label="Select Period"
+              property="period_id"
+              errors={errors}
+              control={control}
+              required="Period is required"
+              options={(periods || []).map((item) => ({
+                value: item.id,
+                label: item.name,
+              }))}
+            />
+
+            <Combobox
+              label="Select Classes"
+              value={studentClass}
+              onChange={classOnChange}
+              options={classes}
+              getOptionLabel={(option) => option?.label ?? option?.name ?? ""}
+              multiple
+              placeholder="Select a Class"
+            />
+
+            {renderPaymentAmountField()}
+
+            <Select
+              label="Payment Method"
+              property="payment_method"
+              errors={errors}
+              control={control}
+              required="Payment Method is required"
+              options={PAYMENT_METHODS.map((m) => ({ value: m, label: m }))}
+            />
+
+            <Checkbox
+              property="is_dropout"
+              label="Is Drop-In Student"
+              control={control}
+            />
+
+            {renderCreditFields()}
+
+            <TextInput
+              label="Notes"
+              property="notes"
+              errors={errors}
+              control={control}
+              placeholder="Payment notes..."
+              rows={3}
+            />
+          </>
+        )}
+      </div>
+      <div className="mt-6 flex justify-end gap-2">
+        <BackButton routeTo="/dashboard/students" />
+        <Button type="submit" autoFocus disabled={isSubmitting}>
+          {isSubmitting
+            ? "Processing..."
+            : `${payment ? "Update" : "Submit"} Payment`}
+        </Button>
+      </div>
+    </form>
+  );
+
   return (
     <div className="mx-auto max-w-2xl px-4 pb-8">
       <Dialog open={creditDialogOpen} onOpenChange={setCreditDialogOpen}>
@@ -338,89 +434,30 @@ const PaymentForm = ({
       </Dialog>
 
       <div className="my-6 rounded-lg border border-brand-dark/10 bg-white p-6 md:my-10 md:p-8">
-        <form onSubmit={handleSubmit(preSubmit)}>
-          <div className="space-y-4 border-t border-brand-dark/10 pt-6">
-            {!isEventPayment && period?.name && (
-              <p className="pb-1 text-base text-brand-dark/60">
-                Current Period: {period.name}
-              </p>
+        {showTabs ? (
+          <Tabs value={tab} onValueChange={onTabChange}>
+            <TabsList className="mb-6">
+              <TabsTrigger value="classes">Classes</TabsTrigger>
+              <TabsTrigger value="event">Event</TabsTrigger>
+              {punchPassPanel && (
+                <TabsTrigger value="punch-pass">Punch pass</TabsTrigger>
+              )}
+            </TabsList>
+            <TabsContent value="classes" className="p-0">
+              {paymentForm}
+            </TabsContent>
+            <TabsContent value="event" className="p-0">
+              {paymentForm}
+            </TabsContent>
+            {punchPassPanel && (
+              <TabsContent value="punch-pass" className="p-0">
+                {punchPassPanel}
+              </TabsContent>
             )}
-            <EventPaymentFields
-              control={control}
-              errors={errors}
-              events={events}
-              isEventPayment={isEventPayment}
-              setIsEventPayment={setIsEventPayment}
-              onSelectEvent={handleEventSelect}
-              renderPaymentAmountField={renderPaymentAmountField}
-              showEventToggle={showEventToggle}
-            />
-
-            {isEventPayment && hasStudent ? renderCreditFields() : null}
-
-            {isEventPayment ? null : (
-              <>
-                <Select
-                  label="Select Period"
-                  property="period_id"
-                  errors={errors}
-                  control={control}
-                  required="Period is required"
-                  options={(periods || []).map((item) => ({
-                    value: item.id,
-                    label: item.name,
-                  }))}
-                />
-
-                <Combobox
-                  label="Select Classes"
-                  value={studentClass}
-                  onChange={classOnChange}
-                  options={classes}
-                  getOptionLabel={(option) => option?.label ?? option?.name ?? ""}
-                  multiple
-                  placeholder="Select a Class"
-                />
-
-                {renderPaymentAmountField()}
-
-                <Select
-                  label="Payment Method"
-                  property="payment_method"
-                  errors={errors}
-                  control={control}
-                  required="Payment Method is required"
-                  options={PAYMENT_METHODS.map((m) => ({ value: m, label: m }))}
-                />
-
-                <Checkbox
-                  property="is_dropout"
-                  label="Is Drop-In Student"
-                  control={control}
-                />
-
-                {renderCreditFields()}
-
-                <TextInput
-                  label="Notes"
-                  property="notes"
-                  errors={errors}
-                  control={control}
-                  placeholder="Payment notes..."
-                  rows={3}
-                />
-              </>
-            )}
-          </div>
-          <div className="mt-6 flex justify-end gap-2">
-            <BackButton routeTo="/dashboard/students" />
-            <Button type="submit" autoFocus disabled={isSubmitting}>
-              {isSubmitting
-                ? "Processing..."
-                : `${payment ? "Update" : "Submit"} Payment`}
-            </Button>
-          </div>
-        </form>
+          </Tabs>
+        ) : (
+          paymentForm
+        )}
       </div>
     </div>
   );

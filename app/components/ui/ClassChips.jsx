@@ -55,10 +55,11 @@ function ClassChips({ colorIds, classes, router, periodId, openInNewTab = false 
     return <Chip label="Not registered" tone="neutral" />;
   }
 
+  // Payments → Enrollments, filtered to everyone in this class.
   const buildClassesUrl = (className) => {
-    const params = new URLSearchParams({ searchParam: className });
+    const params = new URLSearchParams({ tab: "enrollments", searchParam: className });
     if (periodId) params.set("periodId", periodId);
-    return `/dashboard/classes?${params.toString()}`;
+    return `/dashboard/payments?${params.toString()}`;
   };
 
   return (

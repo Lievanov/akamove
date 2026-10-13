@@ -162,6 +162,23 @@ export const getClassesByStudent = async (
   }
 };
 
+// Students enrolled (paid) in one class for a period, by last name.
+export const getClassRoster = async (classId, periodId) => {
+  try {
+    const { data, error } = await supabase
+      .from("classes_by_student_view")
+      .select("id, first_name, last_name, phone")
+      .eq("class_id", classId)
+      .eq("period_id", periodId)
+      .order("last_name", { ascending: true })
+      .order("first_name", { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+  } catch (error) {
+    console.error("Error retrieving class roster", error);
+  }
+};
+
 export const getClassesByStudentCount = async (searchTerm, period_name) => {
   try {
     let query = supabase

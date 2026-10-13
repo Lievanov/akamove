@@ -115,8 +115,8 @@ export const TOURS = {
       {
         target: "classes-table",
         side: "top",
-        title: "Who's in which class",
-        body: "Every student's classes and what they paid, by period.",
+        title: "Schedule and rosters",
+        body: "When and where each class meets this period, and how many students paid for it. Open a class to see its students. Who paid for what is under Payments → Enrollments.",
       },
     ],
   },
