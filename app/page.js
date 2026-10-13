@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getUser } from "@/lib/supabase/client";
 import { getProfileRole } from "@/api/profiles/profiles";
@@ -10,7 +10,6 @@ import { HeroLobe } from "./components/landing/HeroLobe";
 import { FeatureLobe } from "./components/landing/FeatureLobe";
 import { PricingLobe } from "./components/landing/PricingLobe";
 import { ClosingLobe } from "./components/landing/ClosingLobe";
-import { useGoogleSignIn } from "./components/landing/useGoogleSignIn";
 import { frontDesk, floor, office, greenRoom } from "./components/landing/sectionsData";
 
 // useLayoutEffect warns during SSR; this runs it only in the browser.
@@ -19,19 +18,31 @@ const useBrowserLayoutEffect =
 
 function Home() {
   const router = useRouter();
-  const signInWithGoogle = useGoogleSignIn();
-  // Coming back from Google, the URL carries the session (#access_token
-  // or ?code=). Show the loading screen instead of flashing the whole
-  // marketing page before the redirect to /dashboard. Layout effect so
-  // it swaps in before the first paint.
+  const startFree = () => router.push("/login?mode=signup");
+  // Coming back from Google or an email confirmation link, the URL
+  // carries the session (#access_token or ?code=). Show the loading
+  // screen instead of flashing the whole marketing page before the
+  // redirect to /dashboard. Layout effect so it swaps in before the
+  // first paint.
   const [returningFromOAuth, setReturningFromOAuth] = useState(false);
+  const isPasswordRecovery = useRef(false);
 
   useBrowserLayoutEffect(() => {
     const { hash, search } = window.location;
+    // A password-reset link whose redirect fell back to the site URL
+    // (e.g. /reset-password missing from Supabase's redirect allow-list).
+    // The client still stores the recovery session from the hash, so the
+    // reset page picks it up from there.
+    if (hash.includes("type=recovery")) {
+      isPasswordRecovery.current = true;
+      setReturningFromOAuth(true);
+      router.replace("/reset-password");
+      return;
+    }
     if (hash.includes("access_token") || new URLSearchParams(search).has("code")) {
       setReturningFromOAuth(true);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     let isActive = true;
@@ -41,7 +52,7 @@ function Home() {
     // page. /dashboard's own layout handles routing them onward from
     // there (into onboarding if they have no tenant yet).
     getUser().then(async (user) => {
-      if (!isActive) return;
+      if (!isActive || isPasswordRecovery.current) return;
       if (!user?.id) {
         // Sign-in failed or was cancelled — fall back to the landing page.
         setReturningFromOAuth(false);
@@ -70,8 +81,8 @@ function Home() {
         <FeatureLobe area={floor} divider={{ shape: "c", nextColor: "white", parallaxSpeed: "slow" }} />
         <FeatureLobe area={office} divider={{ shape: "d", nextColor: "pink", parallaxSpeed: "med" }} />
         <FeatureLobe area={greenRoom} divider={{ shape: "e", nextColor: "cream", parallaxSpeed: "slow" }} />
-        <PricingLobe onStartFree={signInWithGoogle} divider={{ shape: "f", nextColor: "pink", parallaxSpeed: "med" }} />
-        <ClosingLobe onStartFree={signInWithGoogle} />
+        <PricingLobe onStartFree={startFree} divider={{ shape: "f", nextColor: "pink", parallaxSpeed: "med" }} />
+        <ClosingLobe onStartFree={startFree} />
       </main>
     </>
   );

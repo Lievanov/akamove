@@ -5,7 +5,6 @@ import Image from "next/image";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/app/components/ui/Button";
 import GoogleOAuth from "./oauth/GoogleOAuth";
-import { useGoogleSignIn } from "./landing/useGoogleSignIn";
 
 const navLinks = [
   { label: "Features", href: "#front-desk" },
@@ -15,7 +14,7 @@ const navLinks = [
 function ResponsiveAppBar() {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
-  const signInWithGoogle = useGoogleSignIn();
+  const startFree = () => router.push("/login?mode=signup");
 
   return (
     <header className="sticky top-0 z-40 border-b border-brand-dark/10 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/75">
@@ -41,7 +40,7 @@ function ResponsiveAppBar() {
           <div className="hidden md:block">
             <GoogleOAuth variant="ghost" size="sm" />
           </div>
-          <Button size="sm" onClick={() => signInWithGoogle()} className="hidden sm:inline-flex">
+          <Button size="sm" onClick={startFree} className="hidden sm:inline-flex">
             Start free
           </Button>
           <button
@@ -73,7 +72,7 @@ function ResponsiveAppBar() {
               size="sm"
               onClick={() => {
                 setMenuOpen(false);
-                signInWithGoogle();
+                startFree();
               }}
             >
               Start free

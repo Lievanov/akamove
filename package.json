@@ -8,7 +8,12 @@
     "start": "next start",
     "lint": "next lint",
     "stripe:setup": "node --env-file=.env --env-file=.env.local scripts/stripe-setup.mjs",
-    "billing:scenarios": "node --env-file=.env --env-file=.env.local --import ./scripts/billing-scenarios/register.mjs scripts/billing-scenarios/run.mjs"
+    "billing:scenarios": "node --env-file=.env --env-file=.env.local --import ./scripts/billing-scenarios/register.mjs scripts/billing-scenarios/run.mjs",
+    "test:db:reset": "supabase db reset",
+    "test:seed": "supabase db reset && node --env-file=.env.test scripts/test/seed.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test": "npm run test:seed && playwright test"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -38,6 +43,7 @@
     "uuid": "^11.0.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "autoprefixer": "^10.6.1",
     "eslint": "^8",
     "eslint-config-next": "14.2.16",

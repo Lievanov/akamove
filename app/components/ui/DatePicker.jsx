@@ -41,6 +41,7 @@ function DatePickerCore({
   disabled,
   error,
   placeholder = "Select a date",
+  endMonth,
   ...triggerProps
 }) {
   const [open, setOpen] = useState(false);
@@ -78,7 +79,7 @@ function DatePickerCore({
             classNames={dayPickerClassNames}
             captionLayout="dropdown"
             startMonth={new Date(1920, 0)}
-            endMonth={new Date()}
+            endMonth={endMonth ?? new Date()}
             defaultMonth={value ?? undefined}
           />
         </RadixPopover.Content>
@@ -97,6 +98,7 @@ function DatePicker({
   placeholder = "Select a date",
   value,
   onChange,
+  endMonth,
 }) {
   const hasError = !!errors?.[property];
   const { id, errorId } = useFieldIds();
@@ -118,6 +120,7 @@ function DatePicker({
           onChange={onChange}
           disabled={disabled}
           placeholder={placeholder}
+          endMonth={endMonth}
         />
       </div>
     );
@@ -137,6 +140,7 @@ function DatePicker({
             onChange={field.onChange}
             disabled={disabled}
             placeholder={placeholder}
+            endMonth={endMonth}
             error={hasError}
           />
         )}

@@ -11,6 +11,7 @@ import { PageHeader } from "@/app/components/ui/PageHeader";
 import { useFlashAlert } from "@/app/components/utils/useFlashAlert";
 import { buttonVariants } from "@/app/components/ui/Button";
 import ClassesByStudent from "@/app/components/lists/ClassesByStudent";
+import PunchPassesByStudent from "@/app/components/lists/PunchPassesByStudent";
 
 function ViewStudent() {
   const { id } = useParams();
@@ -76,7 +77,14 @@ function ViewStudent() {
       />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <StudentForm onSubmit={onSubmit} data={student} isReadOnly={true} />
-        <ClassesByStudent studentId={id} />
+        <div className="space-y-4">
+          <PunchPassesByStudent
+            studentId={id}
+            studentName={student.first_name}
+            onChange={setAlert}
+          />
+          <ClassesByStudent studentId={id} />
+        </div>
       </div>
     </>
   );

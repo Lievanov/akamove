@@ -21,7 +21,11 @@ import { usePageTour } from "@/app/context/OnboardingContext";
 import { TOURS } from "@/app/components/onboarding/tours";
 import { getAllLocations } from "@/api/location/location";
 import { getAllClasses } from "@/api/class/class";
-import { getDefaultPrices } from "@/api/settings/settings";
+import {
+  getDefaultPrices,
+  DEFAULT_PERIOD_CLASSES,
+  PERIOD_CLASSES_OPTIONS,
+} from "@/api/settings/settings";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const DAY_OPTIONS = DAYS.map((d) => ({ value: d, label: d }));
@@ -42,9 +46,22 @@ const InlineLink = ({ href, children }) => (
   </Link>
 );
 
+// The class a copied slot gets under each carry-over mode.
+const carriedClassId = (sourceClassId, mode, nextClassMap) =>
+  mode === "advance" ? nextClassMap[sourceClassId] ?? sourceClassId : sourceClassId;
+
 // copiedFrom: name of the period `existingSchedule` was copied from, when
-// a new period starts from the previous one's schedule.
-const PeriodForm = ({ onSubmit, period, existingSchedule = [], copiedFrom }) => {
+// a new period starts from the previous one's schedule. Copied slots keep
+// their original class in `source_class_id` so the "keep same / advance"
+// choice can be switched back and forth; editing a slot's class drops it.
+const PeriodForm = ({
+  onSubmit,
+  period,
+  existingSchedule = [],
+  copiedFrom,
+  nextClassMap = {},
+  defaultClassesMode = DEFAULT_PERIOD_CLASSES,
+}) => {
   const [loading, setLoading] = useState(true);
   const [start_date, setStartDate] = useState(null);
   const [end_date, setEndDate] = useState(null);
@@ -53,6 +70,8 @@ const PeriodForm = ({ onSubmit, period, existingSchedule = [], copiedFrom }) => 
   const [classes, setClasses] = useState([]);
   const [schedule, setSchedule] = useState({});
   const [activeTab, setActiveTab] = useState(0);
+  const [classesMode, setClassesMode] = useState(defaultClassesMode);
+  const isCopy = !period && !!copiedFrom && existingSchedule.length > 0;
 
   const { control, setValue, handleSubmit, formState: { errors, isSubmitting } } = useForm();
   usePageTour(TOURS.periodForm, { ready: !loading });
@@ -71,7 +90,10 @@ const PeriodForm = ({ onSubmit, period, existingSchedule = [], copiedFrom }) => 
         grouped[row.location_id].push({
           day_of_week: row.day_of_week,
           class_time: row.class_time?.slice(0, 5) ?? "09:00",
-          class_id: row.class_id,
+          class_id: isCopy
+            ? carriedClassId(row.class_id, classesMode, nextClassMap)
+            : row.class_id,
+          ...(isCopy && { source_class_id: row.class_id }),
         });
       });
       setSchedule(grouped);
@@ -99,8 +121,24 @@ const PeriodForm = ({ onSubmit, period, existingSchedule = [], copiedFrom }) => 
     setSchedule((prev) => {
       const slots = [...(prev[locationId] ?? [])];
       slots[idx] = { ...slots[idx], [field]: value };
+      if (field === "class_id") delete slots[idx].source_class_id;
       return { ...prev, [locationId]: slots };
     });
+  const changeClassesMode = (mode) => {
+    setClassesMode(mode);
+    setSchedule((prev) =>
+      Object.fromEntries(
+        Object.entries(prev).map(([locationId, slots]) => [
+          locationId,
+          slots.map((slot) =>
+            slot.source_class_id
+              ? { ...slot, class_id: carriedClassId(slot.source_class_id, mode, nextClassMap) }
+              : slot
+          ),
+        ])
+      )
+    );
+  };
   const moveSlot = (locationId, idx, direction) =>
     setSchedule((prev) => {
       const slots = [...(prev[locationId] ?? [])];
@@ -117,7 +155,7 @@ const PeriodForm = ({ onSubmit, period, existingSchedule = [], copiedFrom }) => 
     data.schedule = Object.entries(schedule).flatMap(([locationId, slots]) =>
       slots
         .filter((s) => s.class_id)
-        .map((s, idx) => ({ location_id: locationId, ...s, sort_order: idx }))
+        .map(({ source_class_id, ...s }, idx) => ({ location_id: locationId, ...s, sort_order: idx }))
     );
     await onSubmit(data);
   };
@@ -137,12 +175,48 @@ const PeriodForm = ({ onSubmit, period, existingSchedule = [], copiedFrom }) => 
 
         <form onSubmit={handleSubmit(preSubmit)}>
           <div className="px-6 py-6">
-            {!period && copiedFrom && existingSchedule.length > 0 && (
-              <Alert severity="info" className="mb-6">
-                We copied the schedule from <strong>{copiedFrom}</strong> and moved
-                each class up to its next level, so students continue where they
-                left off. Check each location&apos;s tab before creating the period.
-              </Alert>
+            {isCopy && (
+              <div className="mb-6">
+                <fieldset className="mb-3">
+                  <legend className="mb-2 text-sm font-medium text-brand-dark">
+                    Classes from {copiedFrom}
+                  </legend>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {PERIOD_CLASSES_OPTIONS.map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex cursor-pointer items-center gap-2 rounded-md border border-brand-dark/10 px-3 py-2 text-sm text-brand-dark has-[:checked]:border-brand-pink has-[:checked]:bg-brand-pink/5 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-pink"
+                      >
+                        <input
+                          type="radio"
+                          name="classes_mode"
+                          value={option.value}
+                          checked={classesMode === option.value}
+                          onChange={() => changeClassesMode(option.value)}
+                          className="accent-brand-pink focus:outline-none"
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <Alert severity="info">
+                  {classesMode === "advance" ? (
+                    <>
+                      We copied the schedule from <strong>{copiedFrom}</strong> and moved
+                      each class up to its next level, so students continue where they
+                      left off.
+                    </>
+                  ) : (
+                    <>
+                      We copied the schedule from <strong>{copiedFrom}</strong> with the
+                      same classes, days, and times.
+                    </>
+                  )}{" "}
+                  Check each location&apos;s tab before creating the period. You can
+                  change which option is selected by default in Settings.
+                </Alert>
+              </div>
             )}
 
             <div className="mb-8" data-tour="period-details">

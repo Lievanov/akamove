@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPeriod, getLatestPeriod } from "@/api/period/period";
 import { getScheduleByPeriod, upsertScheduleForPeriod } from "@/api/period/period_location_class";
 import { getAllClasses, buildNextClassMap } from "@/api/class/class";
+import { getPeriodClassesMode, DEFAULT_PERIOD_CLASSES } from "@/api/settings/settings";
 import PeriodForm from "@/app/components/form/PeriodForm";
 import { Toast } from "@/app/components/ui/Toast";
 import { PageHeader } from "@/app/components/ui/PageHeader";
@@ -14,24 +15,24 @@ function NewPeriod() {
   const [alert, setAlert] = useState({ text: "", severity: "" });
   const [previousSchedule, setPreviousSchedule] = useState([]);
   const [previousPeriodName, setPreviousPeriodName] = useState(null);
+  const [nextClassMap, setNextClassMap] = useState({});
+  const [classesMode, setClassesMode] = useState(DEFAULT_PERIOD_CLASSES);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadPreviousSchedule = async () => {
       const latestPeriod = await getLatestPeriod();
       if (latestPeriod?.id) {
-        const [schedule, classes] = await Promise.all([
+        const [schedule, classes, mode] = await Promise.all([
           getScheduleByPeriod(latestPeriod.id),
           getAllClasses(),
+          getPeriodClassesMode(),
         ]);
-        // Advance each class to the next one in its class_type track, so the
-        // new period picks up where students left off (e.g. order 3 -> order 4).
-        const nextClassMap = buildNextClassMap(classes ?? []);
-        const advanced = (schedule ?? []).map((row) => ({
-          ...row,
-          class_id: nextClassMap[row.class_id] ?? row.class_id,
-        }));
-        setPreviousSchedule(advanced);
+        // The form either keeps these classes or advances each one to the
+        // next in its class_type track (e.g. order 3 -> order 4), per `mode`.
+        setPreviousSchedule(schedule ?? []);
+        setNextClassMap(buildNextClassMap(classes ?? []));
+        setClassesMode(mode);
         setPreviousPeriodName(latestPeriod.name);
       }
       setLoading(false);
@@ -71,6 +72,8 @@ function NewPeriod() {
         onSubmit={onSubmit}
         existingSchedule={previousSchedule}
         copiedFrom={previousPeriodName}
+        nextClassMap={nextClassMap}
+        defaultClassesMode={classesMode}
       />
     </>
   );

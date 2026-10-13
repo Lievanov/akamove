@@ -5,6 +5,17 @@ const DEFAULT_PRICES_KEY = "default_prices";
 const STUDIO_FEE_KEY = "private_lesson_studio_fee";
 const TIMEZONE_KEY = "timezone";
 const CHECKLIST_DISMISSED_KEY = "onboarding_checklist_dismissed";
+const PERIOD_CLASSES_KEY = "new_period_classes";
+const PERIOD_AUTO_CREATE_KEY = "period_auto_create";
+
+// How a new period carries over the previous period's schedule: "advance"
+// moves each class up to its next level, "same" keeps the classes as they are.
+export const DEFAULT_PERIOD_CLASSES = "advance";
+
+export const PERIOD_CLASSES_OPTIONS = [
+  { value: "advance", label: "Advance each class to its next level" },
+  { value: "same", label: "Keep the same classes" },
+];
 
 // IANA timezone used to decide "day-of" event pricing and other date logic.
 export const DEFAULT_TIMEZONE = "America/Indiana/Indianapolis";
@@ -94,3 +105,48 @@ export const getChecklistDismissed = async () =>
 
 export const saveChecklistDismissed = async (dismissed) =>
   upsertSetting(CHECKLIST_DISMISSED_KEY, !!dismissed);
+
+export const getPeriodClassesMode = async () => {
+  const value = await getSetting(PERIOD_CLASSES_KEY);
+  return PERIOD_CLASSES_OPTIONS.some((option) => option.value === value)
+    ? value
+    : DEFAULT_PERIOD_CLASSES;
+};
+
+export const savePeriodClassesMode = async (mode) =>
+  upsertSetting(PERIOD_CLASSES_KEY, mode || DEFAULT_PERIOD_CLASSES);
+
+// Automatic monthly periods (Studio and Pro Studio). Read by the hourly
+// auto_create_periods() job (migration 020): on or after `day` of the
+// month, in the studio's timezone, next month's period is created.
+export const PERIOD_AUTO_CREATE_PLANS = ["studio", "pro studio"];
+
+export const DEFAULT_PERIOD_AUTO_CREATE = {
+  enabled: false,
+  day: 25,
+  name_format: "month_year",
+};
+
+// Labels match auto_period_name() in migration 020.
+export const PERIOD_NAME_FORMAT_OPTIONS = [
+  { value: "month_year", label: "November 2026" },
+  { value: "short_month_year", label: "Nov 2026" },
+  { value: "year_month", label: "2026-11" },
+];
+
+export const PERIOD_AUTO_CREATE_DAY_OPTIONS = Array.from({ length: 28 }, (_, i) => ({
+  value: String(i + 1),
+  label: String(i + 1),
+}));
+
+export const getPeriodAutoCreate = async () => {
+  const value = await getSetting(PERIOD_AUTO_CREATE_KEY);
+  return { ...DEFAULT_PERIOD_AUTO_CREATE, ...(value && typeof value === "object" ? value : {}) };
+};
+
+export const savePeriodAutoCreate = async ({ enabled, day, name_format }) =>
+  upsertSetting(PERIOD_AUTO_CREATE_KEY, {
+    enabled: !!enabled,
+    day: Math.min(Math.max(Number(day) || DEFAULT_PERIOD_AUTO_CREATE.day, 1), 28),
+    name_format: name_format || DEFAULT_PERIOD_AUTO_CREATE.name_format,
+  });

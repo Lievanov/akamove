@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import moment from "moment";
 import { getPushTokens } from "@/api/profiles/profiles";
+import supabaseAdmin from "@/lib/supabase/admin";
 
 export async function POST(request) {
   try {
     const event = await request.json();
-    const tokens = await getPushTokens();
+    const tokens = await getPushTokens(supabaseAdmin);
     if (tokens.length === 0) return NextResponse.json({ sent: 0 });
 
     const messages = tokens.map((token) => ({

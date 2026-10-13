@@ -1,6 +1,7 @@
 import supabase from "@/lib/supabase/client";
 import { getPrivateLessonRevenueInRange } from "../private_lesson/private_lesson";
 import { getEventRevenueInRange } from "../events/event_payment";
+import { getPassRevenueInRange } from "../punch_pass/punch_pass";
 import { getActiveTenantId } from "@/lib/tenant/activeTenant";
 
 const notifyPeriodCreated = async (period) => {
@@ -219,17 +220,21 @@ export const getPeriodRevenueSummary = async (periodId) => {
     const period = await getPeriodById(periodId);
     if (!period) throw new Error("Period not found");
 
-    const [classesRevenue, privateLessonsRevenue, eventsRevenue] = await Promise.all([
-      getClassesRevenueForPeriod(periodId),
-      getPrivateLessonRevenueInRange(period.start_date, period.end_date),
-      getEventRevenueInRange(period.start_date, period.end_date),
-    ]);
+    const [classesRevenue, privateLessonsRevenue, eventsRevenue, punchPassesRevenue] =
+      await Promise.all([
+        getClassesRevenueForPeriod(periodId),
+        getPrivateLessonRevenueInRange(period.start_date, period.end_date),
+        getEventRevenueInRange(period.start_date, period.end_date),
+        getPassRevenueInRange(period.start_date, period.end_date),
+      ]);
 
     return {
       classesRevenue,
       privateLessonsRevenue,
       eventsRevenue,
-      totalRevenue: classesRevenue + privateLessonsRevenue + eventsRevenue,
+      punchPassesRevenue,
+      totalRevenue:
+        classesRevenue + privateLessonsRevenue + eventsRevenue + punchPassesRevenue,
     };
   } catch (error) {
     console.error("Error retrieving period revenue summary", error);
@@ -237,7 +242,42 @@ export const getPeriodRevenueSummary = async (periodId) => {
       classesRevenue: 0,
       privateLessonsRevenue: 0,
       eventsRevenue: 0,
+      punchPassesRevenue: 0,
       totalRevenue: 0,
     };
+  }
+};
+
+// Periods the auto_create_periods() job made (migration 020) that staff
+// haven't reviewed yet — shown as a notice on the Periods page.
+export const getUnreviewedAutoPeriods = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("period_auto_run")
+      .select("month, created_at, period:period_id(id, name)")
+      .eq("tenant_id", getActiveTenantId())
+      .eq("status", "created")
+      .is("reviewed_at", null)
+      .order("month", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).filter((row) => row.period);
+  } catch (error) {
+    console.error("Error retrieving auto-created periods", error);
+    return [];
+  }
+};
+
+export const markAutoPeriodReviewed = async (month) => {
+  try {
+    const { error } = await supabase
+      .from("period_auto_run")
+      .update({ reviewed_at: new Date().toISOString() })
+      .eq("tenant_id", getActiveTenantId())
+      .eq("month", month);
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error("Error dismissing auto-created period notice", error);
+    return false;
   }
 };

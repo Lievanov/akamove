@@ -44,3 +44,12 @@ next-env.d.ts
 # stays tracked; only these local-only files are excluded.
 .claude/settings.local.json
 .impeccable/*.local.json
+
+# Test env (local Supabase; may later hold a Stripe test key)
+.env.test
+
+# Playwright
+/.next-e2e/
+/e2e/.auth/
+/test-results/
+/playwright-report/

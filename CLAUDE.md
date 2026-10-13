@@ -8,6 +8,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run build` - Build for production
 - `npm start` - Start production server
 - `npm run lint` - Run linting
+- `npm test` - Reset + seed the local Supabase, then run the Playwright E2E suite (needs Docker and `supabase start`)
+- `npm run test:seed` - Reset the local DB and seed fake studios/users (`e2e/fixtures.mjs`, password `Test1234!`)
+- `npm run test:e2e` / `npm run test:e2e:ui` - Run Playwright only (headless / interactive)
+
+### Testing
+
+Tests never touch the cloud Supabase (the shared dev project): they run against a local Supabase (`supabase/`, schema dumped from the cloud project in `supabase/migrations/`) via `.env.test`, and Playwright starts its own dev server on port 3100 (build dir `.next-e2e`). Fake emails land in Mailpit at http://127.0.0.1:54324. Logins are saved per role in `e2e/auth.setup.mjs`; use `test.use({ storageState: authFile("proAdmin") })` in specs.
+
+## Backlog
+
+Planned work lives in `backlog/` (one markdown file per epic, indexed in `backlog/README.md`). Check it before starting feature work, tick off stories as they're completed in the same change, and keep the README's status sections in sync.
 
 ## Architecture Overview
 
@@ -29,6 +40,7 @@ The application manages these main entities (see `api/db.sql`):
 - `location` - Physical studio locations, each with its own per-period schedule
 - `event` / `event_payment` - Special events with day-of vs. advance pricing
 - `private_lesson` - One-off private lessons, separate from recurring classes
+- `punch_pass_type` / `punch_pass` / `punch_pass_entry` - Punch passes: a studio's pass catalog, passes sold to students (own price, not a `payment` row), and one entry per class attended. Punches go through the `record_punch` RPC, which uses the oldest usable pass first
 - `credit` - Student account credits (applied via the Payment form's credit fields)
 - `notes` - Free-form notes attached to students
 - `profiles` - Auth-linked user profiles (Google OAuth, push tokens); keyed on `id` matching `auth.users.id`, linked to `student` by email
@@ -37,7 +49,7 @@ The application manages these main entities (see `api/db.sql`):
 
 ### Project Structure
 
-- `api/` - Backend data-access modules organized by entity (`class`, `credit`, `events`, `instructor`, `location`, `notes`, `payment`, `period`, `private_lesson`, `profiles`, `settings`, `student`, `charts`)
+- `api/` - Backend data-access modules organized by entity (`class`, `credit`, `events`, `punch_pass`, `instructor`, `location`, `notes`, `payment`, `period`, `private_lesson`, `profiles`, `settings`, `student`, `charts`)
 - `app/` - Next.js App Router pages and components
   - `dashboard/` - Main application interface with nested routes (see Dashboard Sections below)
   - `api/` - Next.js Route Handlers for account deletion and push notifications
@@ -47,7 +59,7 @@ The application manages these main entities (see `api/db.sql`):
 
 ### Dashboard Sections (`app/dashboard/`)
 
-- **Students** (`students/`) - Roster, student detail/edit pages, new-student flow
+- **Students** (`students/`) - Roster, student detail/edit pages, new-student flow. The detail page holds the punch pass card (sell a pass, record/correct/undo entries)
 - **Classes** (`classes/`) - Class list and bulk update flow
 - **Periods** (`periods/`) - Create/edit periods, per-location schedules, class assignment
 - **Instructors** (`instructors/`) - Instructor roster and detail pages
@@ -56,7 +68,7 @@ The application manages these main entities (see `api/db.sql`):
 - **Private Lessons** (`private-lessons/`) - Lesson roster, detail pages, and a dedicated **reports** view (period revenue: classes + private lessons + events by date range)
 - **Payments** (`payments/`) - Payment roster, per-student payment history, and edit flow
 - **Notes** (`notes/`) - Student notes
-- **Settings** (`settings/`) - Default class prices, private-lesson studio fee, studio timezone
+- **Settings** (`settings/`) - Default class prices, private-lesson studio fee, studio timezone; punch pass types (`settings/punch-passes/`)
 
 ### Key Components
 

@@ -22,7 +22,7 @@ import { getTimezone, DEFAULT_TIMEZONE } from "@/api/settings/settings";
 import { getTodayInTimezone } from "../utils/utils";
 import EventPaymentFields from "./EventPaymentFields";
 
-const PAYMENT_METHODS = ["Card", "Cash", "Venmo", "Groupon", "Gift Certificate"];
+export const PAYMENT_METHODS = ["Card", "Cash", "Venmo", "Groupon", "Gift Certificate"];
 
 const PaymentForm = ({
   onSubmit,

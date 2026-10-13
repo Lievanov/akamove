@@ -1,8 +1,10 @@
 import supabase from "@/lib/supabase/client";
 
-export const getPushTokens = async () => {
+// Server routes only: every user's token, which profiles RLS (migration
+// 021) hides from the browser client — pass the service-role client.
+export const getPushTokens = async (client) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from("profiles")
       .select("push_token")
       .not("push_token", "is", null);

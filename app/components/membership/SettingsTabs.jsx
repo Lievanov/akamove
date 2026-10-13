@@ -5,6 +5,7 @@ import { cn } from "@/app/components/ui/utils/cn";
 
 const TABS = [
   { label: "General", href: "/dashboard/settings" },
+  { label: "Punch passes", href: "/dashboard/settings/punch-passes" },
   { label: "Membership", href: "/dashboard/settings/membership" },
 ];
 

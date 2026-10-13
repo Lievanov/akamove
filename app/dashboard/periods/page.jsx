@@ -1,15 +1,21 @@
 "use client";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarRange, Pencil } from "lucide-react";
 import { formatDate } from "@/app/components/utils/utils";
-import { getPeriodCount, getPeriods } from "@/api/period/period";
+import {
+  getPeriodCount,
+  getPeriods,
+  getUnreviewedAutoPeriods,
+  markAutoPeriodReviewed,
+} from "@/api/period/period";
 import Loading from "@/app/components/Loading";
 import { Toast } from "@/app/components/ui/Toast";
 import { PageHeader } from "@/app/components/ui/PageHeader";
 import { buttonVariants } from "@/app/components/ui/Button";
 import { iconButtonClass } from "@/app/components/ui/IconButton";
 import { Chip } from "@/app/components/ui/Chip";
+import { Alert } from "@/app/components/ui/Alert";
 import { EmptyState } from "@/app/components/ui/EmptyState";
 import {
   ServerTableCard,
@@ -51,9 +57,19 @@ const periodStatus = (row, today) => {
 function Periods() {
   const [alert, setAlert] = useFlashAlert();
   const table = useServerTable({ fetchPage: fetchPeriods });
+  const [autoPeriods, setAutoPeriods] = useState([]);
   usePageTour(TOURS.periods, { ready: !table.isLoading });
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  useEffect(() => {
+    getUnreviewedAutoPeriods().then(setAutoPeriods);
+  }, []);
+
+  const dismissAutoPeriod = async (month) => {
+    setAutoPeriods((prev) => prev.filter((row) => row.month !== month));
+    await markAutoPeriodReviewed(month);
+  };
 
   const addPeriodButton = (
     <Link
@@ -76,6 +92,25 @@ function Periods() {
             onExited={() => setAlert({ text: "", severity: "" })}
           />
         )}
+        {autoPeriods.map((row) => (
+          <Alert
+            key={row.month}
+            severity="info"
+            className="mb-4"
+            onClose={() => dismissAutoPeriod(row.month)}
+          >
+            <strong>{row.period.name}</strong> was created automatically on{" "}
+            {formatDate(row.created_at)}, copied from the previous period. Check
+            its schedule and prices.{" "}
+            <Link
+              href={`/dashboard/periods/${row.period.id}`}
+              onClick={() => dismissAutoPeriod(row.month)}
+              className="font-semibold underline"
+            >
+              Review it
+            </Link>
+          </Alert>
+        ))}
         {table.isLoading ? (
           <Loading variant="table" />
         ) : table.isEmpty ? (

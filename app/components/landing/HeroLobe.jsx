@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { Button } from "@/app/components/ui/Button";
-import { useGoogleSignIn } from "./useGoogleSignIn";
+import { useRouter } from "next/navigation";
 import { LobeDivider } from "./LobeDivider";
 
 function HeroLobe() {
   const sectionRef = useRef(null);
-  const signInWithGoogle = useGoogleSignIn();
+  const router = useRouter();
 
   useEffect(() => {
     const section = sectionRef.current;
@@ -61,7 +61,7 @@ function HeroLobe() {
             <Button
               size="lg"
               variant="primary"
-              onClick={() => signInWithGoogle()}
+              onClick={() => router.push("/login?mode=signup")}
             >
               Start free
             </Button>

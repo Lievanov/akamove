@@ -54,7 +54,7 @@ function GoogleOAuth({ variant = "primary", size = "md" }) {
       <Button variant="ghost" size={size} onClick={() => logOut()}>Log out</Button>
       </>)
       ) || (
-        <Button variant={variant} size={size} onClick={() => handleSignInWithGoogle()}>
+        <Button variant={variant} size={size} onClick={() => router.push("/login")}>
           Log In
         </Button>
       )}

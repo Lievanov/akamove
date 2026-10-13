@@ -9,6 +9,7 @@ import { getPeriodById } from "@/api/period/period";
 import PeriodRevenueSummary from "@/app/components/charts/PeriodRevenueSummary";
 import PrivateLessonsByPeriod from "@/app/components/charts/PrivateLessonsByPeriod";
 import EventsByPeriod from "@/app/components/charts/EventsByPeriod";
+import PunchPassesByPeriod from "@/app/components/charts/PunchPassesByPeriod";
 
 function PeriodReport() {
   const { periodId } = useParams();
@@ -56,6 +57,12 @@ function PeriodReport() {
             )}
             {selectedCategory === "events" && (
               <EventsByPeriod
+                startDate={period.start_date}
+                endDate={period.end_date}
+              />
+            )}
+            {selectedCategory === "punch_passes" && (
+              <PunchPassesByPeriod
                 startDate={period.start_date}
                 endDate={period.end_date}
               />

@@ -23,6 +23,7 @@ const PeriodRevenueSummary = ({ periodId, selectedCategory, onSelectCategory }) 
     classesRevenue: 0,
     privateLessonsRevenue: 0,
     eventsRevenue: 0,
+    punchPassesRevenue: 0,
     totalRevenue: 0,
   });
 
@@ -61,6 +62,12 @@ const PeriodRevenueSummary = ({ periodId, selectedCategory, onSelectCategory }) 
           amount={summary.eventsRevenue}
           selected={selectedCategory === "events"}
           onClick={() => onSelectCategory?.("events")}
+        />
+        <SummaryRow
+          label="Punch Passes"
+          amount={summary.punchPassesRevenue}
+          selected={selectedCategory === "punch_passes"}
+          onClick={() => onSelectCategory?.("punch_passes")}
         />
       </div>
     </div>

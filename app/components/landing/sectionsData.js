@@ -138,7 +138,7 @@ export const pricingTiers = [
     monthlyPrice: planPrice("studio"),
     cap: "Up to 100 monthly active students",
     tone: "solid",
-    features: ["Everything in Starter", "Periods", "Reporting", "Roles"],
+    features: ["Everything in Starter", "Periods", "Automatic monthly periods", "Reporting", "Roles"],
   },
   {
     name: "Pro Studio",
